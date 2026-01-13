@@ -1,0 +1,51 @@
+# Android
+.gradle/
+.idea/
+*.iml
+build/
+*.apk
+*.aab
+*.jks
+local.properties
+
+# Gradle
+.gradle
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*~
+
+# Kotlin
+.kotlin/
+
+# Mac
+.DS_Store
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build output
+bin/
+gen/
+out/
+build/
+
+# Misc
+*.log
+.classpath
+.project
+.settings/
+local.properties
+
+# Project specific
+*.hprof
