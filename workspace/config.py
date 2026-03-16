@@ -7,11 +7,26 @@ PROJECT_ROOT = WORKSPACE_DIR.parent
 
 # External paths (update these if the environment changes)
 EDL_REPO_PATH = Path(r"C:\Users\Andrew Price\Lazarus_11\edl_repo")
-FIRMWARE_ROOT = Path(r"C:\Users\Andrew Price\Desktop\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\op11\IMAGES")
+
+# Primary firmware source: OP11-AUTO-RECOVER flash_ready (complete, all 6 UFS LUNs)
+FIRMWARE_ROOT = Path(r"C:\Users\Andrew Price\OP11-AUTO-RECOVER\flash_ready")
+
+# Fallback firmware source (original export zip)
+FIRMWARE_ROOT_ALT = Path(r"C:\Users\Andrew Price\Desktop\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\op11\IMAGES")
 
 # Device Configuration
 PORT = "COM7"
 LOADER_PATH = FIRMWARE_ROOT / "prog_firehose_ddr.elf"
+
+# CPH2451 UFS LUN map (SM8550 / Snapdragon 8 Gen 2)
+# LUN0: userdata, super, persist, GPT
+# LUN1: xbl_a, xbl_config_a, apdp (Slot A bootloader)
+# LUN2: xbl_b, xbl_config_b, apdpb (Slot B bootloader)
+# LUN3: cdt, engineering_cdt, ddr (calibration/config)
+# LUN4: main firmware - 84 partitions, A/B slots (modem, TZ, boot, DSP, etc.)
+# LUN5: nvbk, modemst1/2, oplusreserve1-5 (modem calibration + reserves)
+RAWPROGRAM_FILES = [f"rawprogram{i}.xml" for i in range(6)]
+PATCH_FILES = [f"patch{i}.xml" for i in range(6)]
 
 # Firehose arguments
 FIREHOSE_ARGS = {
