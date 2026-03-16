@@ -81,7 +81,16 @@ def upload_loader_with_fallback(use_vip: bool) -> Optional[Tuple[object, object,
         logger.info(f"Trying {loader_label} loader: {loader_path.name} ({loader_path.stat().st_size} bytes)")
 
         cdc = make_usb_cdc()
-        connected = cdc.connect()
+        try:
+            connected = cdc.connect()
+        except NotImplementedError:
+            logger.error("libusb cannot open the EDL device - Windows driver not installed.")
+            logger.error("Run workspace\\scripts\\setup_driver.bat to install WinUSB via Zadig.")
+            logger.error("Steps: put phone in EDL mode -> open Zadig -> select QHSUSB_BULK -> install WinUSB")
+            return None
+        except Exception as e:
+            logger.error(f"USB connect error: {e}")
+            return None
         if not connected:
             logger.error("USB connect failed. Is device in EDL mode?")
             return None

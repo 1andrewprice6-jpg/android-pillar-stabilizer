@@ -101,9 +101,9 @@ echo.
 echo ============================================================
 echo  RECOVERY FAILED
 echo  Check logs above. Common fixes:
+echo    - If "libusb cannot open" error: run setup_driver.bat (Zadig/WinUSB)
 echo    - Re-enter EDL mode and run again
 echo    - Run force_usb_reset.bat then retry
-echo    - Check workspace\config.py PORT setting
 echo    - Try: python vip_flash.py --vip --lun all
 echo ============================================================
 pause
