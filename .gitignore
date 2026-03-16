@@ -49,3 +49,27 @@ local.properties
 
 # Project specific
 *.hprof
+
+# Development certificate
+devcert.pfx
+
+# Windows SDK packages and generated files
+.winapp
+
+NEONPROTOCOL/[Ll]ibrary/
+NEONPROTOCOL/[Tt]emp/
+NEONPROTOCOL/[Oo]bj/
+NEONPROTOCOL/[Bb]uild/
+NEONPROTOCOL/[Bb]uilds/
+NEONPROTOCOL/[Ll]ogs/
+NEONPROTOCOL/[Uu]ser[Ss]ettings/
+
+
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+

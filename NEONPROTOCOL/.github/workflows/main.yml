@@ -1,0 +1,63 @@
+name: Neon Protocol Android Forge
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  buildForAndroid:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Extract the code from your repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Verify required Unity license secrets are configured
+      - name: Verify Unity License Secrets
+        run: |
+          if [ -z "$UNITY_LICENSE" ] && { [ -z "$UNITY_EMAIL" ] || [ -z "$UNITY_PASSWORD" ]; }; then
+            echo "::error::Missing Unity license secrets."
+            echo "::error::To fix this, follow the steps in README.md under 'Setting Up the Build':"
+            echo "::error::  1. Run the 'Unity License Activation' workflow to generate a .alf file."
+            echo "::error::  2. Submit the .alf to https://license.unity3d.com to obtain a .ulf license file."
+            echo "::error::  3. Add the .ulf file contents as the UNITY_LICENSE repository secret."
+            echo "::error::  4. Add your Unity account email as UNITY_EMAIL and password as UNITY_PASSWORD secrets."
+            exit 1
+          fi
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+      # Step 3: Cache the Unity Library folder to speed up subsequent builds
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-Android-
+            Library-
+
+      # Step 4: Utilize the Unity Builder node
+      - name: Compile Unity APK
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 2022.3.10f1
+          targetPlatform: Android
+          buildName: NeonProtocol
+          allowDirtyBuild: true
+
+      # Step 5: Return the compiled APK to your mobile node
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeonProtocol-Android-Build
+          path: build/Android/NeonProtocol.apk

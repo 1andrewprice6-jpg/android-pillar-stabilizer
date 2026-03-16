@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Z-Hunter: Professional Edition</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+
+    <style>
+      body { margin: 0; overflow: hidden; }
+      #ui {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        z-index: 100;
+        text-shadow: 2px 2px #000;
+        font-size: 18px;
+        pointer-events: none;
+      }
+      #health-bar-container {
+        position: fixed;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 300px;
+        height: 30px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid #00ff00;
+        z-index: 100;
+        pointer-events: none;
+      }
+      #health-bar {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, #ff0000, #ff6600, #00ff00);
+        transition: width 0.3s ease;
+      }
+      #ammo-display {
+        position: fixed;
+        bottom: 40px;
+        right: 40px;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        font-size: 32px;
+        text-shadow: 2px 2px #000;
+        z-index: 100;
+        pointer-events: none;
+      }
+      #points-display {
+        position: fixed;
+        top: 20px;
+        right: 40px;
+        color: #ffff00;
+        font-family: 'Courier New', monospace;
+        font-size: 28px;
+        text-shadow: 2px 2px #000;
+        z-index: 100;
+        pointer-events: none;
+      }
+      #buy-prompt {
+        display: none;
+        position: fixed;
+        top: 40%;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #ffff00;
+        font-family: 'Courier New', monospace;
+        font-size: 24px;
+        text-shadow: 3px 3px #000;
+        z-index: 150;
+        pointer-events: none;
+        text-align: center;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px 30px;
+        border: 2px solid #ffff00;
+      }
+      #reload-text {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #ff6600;
+        font-family: 'Courier New', monospace;
+        font-size: 48px;
+        text-shadow: 3px 3px #000;
+        z-index: 150;
+        pointer-events: none;
+        animation: pulse 0.5s infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      #scope {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle, transparent 15%, black 80%);
+        z-index: 10;
+        pointer-events: none;
+      }
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 2px;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.8);
+        transform: translate(-50%, -50%);
+      }
+      #crosshair::before,
+      #crosshair::after {
+        content: '';
+        position: absolute;
+        background: rgba(255, 255, 255, 0.8);
+      }
+      #crosshair::before {
+        width: 12px;
+        height: 2px;
+        left: -5px;
+        top: 0;
+      }
+      #crosshair::after {
+        width: 2px;
+        height: 12px;
+        left: 0;
+        top: -5px;
+      }
+      #hitmarker {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 40px;
+        height: 40px;
+        transform: translate(-50%, -50%);
+        z-index: 50;
+        pointer-events: none;
+      }
+      #hitmarker::before,
+      #hitmarker::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 2px;
+        background: white;
+        top: 50%;
+        left: 0;
+      }
+      #hitmarker::before {
+        transform: rotate(45deg);
+      }
+      #hitmarker::after {
+        transform: rotate(-45deg);
+      }
+      #wave-announce {
+        display: none;
+        position: fixed;
+        top: 30%;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #ff0000;
+        font-family: 'Courier New', monospace;
+        font-size: 64px;
+        text-shadow: 4px 4px #000;
+        z-index: 200;
+        pointer-events: none;
+        animation: slideIn 0.5s ease;
+      }
+      @keyframes slideIn {
+        from { transform: translateX(-50%) translateY(-100px); opacity: 0; }
+        to { transform: translateX(-50%) translateY(0); opacity: 1; }
+      }
+      #easter-egg-icons {
+        position: fixed;
+        bottom: 90px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 20px;
+        z-index: 100;
+        pointer-events: none;
+      }
+      .relic-icon {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #666;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 50%;
+        transition: all 0.3s ease;
+      }
+      .relic-icon.found {
+        border-color: #ffd700;
+        background: #ffd700;
+        box-shadow: 0 0 20px #ffd700;
+      }
+      #screen-flash {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: white;
+        z-index: 999;
+        pointer-events: none;
+        animation: flash 0.3s ease;
+      }
+      @keyframes flash {
+        0% { opacity: 0; }
+        50% { opacity: 0.8; }
+        100% { opacity: 0; }
+      }
+    </style>
+
+    <script>
+      let score = 0;
+      let points = 500; // Starting money
+      let weaponIdx = 0;
+      let isADS = false;
+      let health = 100;
+      let wave = 1;
+      let zombieCount = 0;
+      let maxZombies = 10;
+      let spawnRate = 2000;
+      let zombiePool = [];
+      let isReloading = false;
+      let hoveredBuyable = null;
+
+      // EASTER EGG SYSTEM
+      let easterEggStage = 0;
+      let relicsFound = 0;
+      let soulBoxCharge = 0;
+      let easterEggComplete = false;
+
+      // WEAPON LOADOUT: Professional Arsenal System with Stats
+      const weaponLoadout = [
+        {
+          name: "Assault Rifle",
+          model: "#assault-rifle",
+          ads: "0 -0.15 -0.2",          // ADS position (center-aligned for scope)
+          hip: "0.3 -0.25 -0.5",         // Hip position (off to the side)
+          adsRot: "0 180 0",             // ADS rotation (straight forward)
+          hipRot: "0 170 0",             // Hip rotation
+          scale: "0.05 0.05 0.05",
+          barrelOffset: "0 0 -2",        // Where the bullet visually comes from
+          damage: 50,
+          fireRate: 150,
+          maxAmmo: 30,
+          ammo: 30,
+          reloadTime: 2000
+        },
+        {
+          name: "Zombie Walker",
+          model: "#zombie-walker",
+          ads: "0 -0.12 -0.3",
+          hip: "0.2 -0.25 -0.4",
+          adsRot: "0 180 0",
+          hipRot: "0 180 0",
+          scale: "0.6 0.6 0.6",
+          barrelOffset: "0 0 -1",
+          damage: 100,
+          fireRate: 800,
+          maxAmmo: 1,
+          ammo: 1,
+          reloadTime: 3000
+        },
+        {
+          name: "Zombie Horde",
+          model: "#zombie-horde",
+          ads: "0 -0.1 -0.25",
+          hip: "0.3 -0.2 -0.5",
+          adsRot: "0 180 0",
+          hipRot: "0 90 0",
+          scale: "0.15 0.15 0.15",
+          barrelOffset: "0 0 -1.5",
+          damage: 30,
+          fireRate: 100,
+          maxAmmo: 60,
+          ammo: 60,
+          reloadTime: 2500
+        }
+      ];
+
+      function updateAmmoDisplay() {
+        const weapon = weaponLoadout[weaponIdx];
+        document.getElementById('ammo-display').innerHTML =
+          `${weapon.ammo} / ${weapon.maxAmmo}`;
+      }
+
+      function updateHealthBar() {
+        document.getElementById('health-bar').style.width = health + '%';
+      }
+
+      function updatePointsDisplay() {
+        document.getElementById('points-display').innerHTML = `$${points}`;
+      }
+
+      function addPoints(amount) {
+        points += amount;
+        updatePointsDisplay();
+      }
+
+      function spendPoints(amount) {
+        if (points >= amount) {
+          points -= amount;
+          updatePointsDisplay();
+          return true;
+        }
+        return false;
+      }
+
+      function screenFlash() {
+        const flash = document.getElementById('screen-flash');
+        flash.style.display = 'block';
+        setTimeout(() => {
+          flash.style.display = 'none';
+        }, 300);
+      }
+
+      function findRelic(relicNum) {
+        relicsFound++;
+        document.getElementById(`relic-icon-${relicNum}`).classList.add('found');
+        screenFlash();
+
+        if (relicsFound >= 3) {
+          easterEggStage = 1;
+          screenFlash();
+
+          // Activate Soul Box
+          const soulBox = document.querySelector('#soul-box');
+          if (soulBox) {
+            soulBox.setAttribute('visible', true);
+            soulBox.components['soul-box'].activate();
+          }
+
+          // Environmental change - sky turns red
+          document.querySelector('a-sky').setAttribute('color', '#220000');
+
+          // Mystery box discount
+          const mysteryBox = document.querySelector('[mystery-box]');
+          if (mysteryBox) {
+            mysteryBox.setAttribute('mystery-box', 'price', 475);
+          }
+        }
+      }
+
+      function chargeSoulBox() {
+        if (easterEggStage !== 1) return;
+
+        soulBoxCharge++;
+        const soulBox = document.querySelector('#soul-box');
+
+        if (soulBoxCharge >= 10) {
+          easterEggStage = 2;
+          easterEggComplete = true;
+          screenFlash();
+
+          // Activate reward
+          if (soulBox) {
+            soulBox.components['soul-box'].openBox();
+          }
+        }
+      }
+
+      function takeDamage(amount) {
+        health -= amount;
+        if (health < 0) health = 0;
+        updateHealthBar();
+
+        // Play damage sound
+        document.getElementById('sound-damage').play();
+
+        // Screen flash effect
+        document.querySelector('a-scene').setAttribute('animation', {
+          property: 'fog.color',
+          to: '#ff0000',
+          dur: 100
+        });
+        setTimeout(() => {
+          document.querySelector('a-scene').setAttribute('animation', {
+            property: 'fog.color',
+            to: '#000000',
+            dur: 100
+          });
+        }, 100);
+
+        if (health <= 0) {
+          alert('GAME OVER - Final Score: ' + score + ' | Wave: ' + wave);
+          location.reload();
+        }
+      }
+
+      function startNewWave() {
+        wave++;
+        maxZombies += 5;
+        spawnRate = Math.max(500, spawnRate - 200); // Faster spawning each wave
+
+        document.getElementById('wave-num').innerHTML = wave;
+
+        // Wave announcement
+        const announce = document.getElementById('wave-announce');
+        announce.innerHTML = `WAVE ${wave}`;
+        announce.style.display = 'block';
+        document.getElementById('sound-wave').play();
+
+        setTimeout(() => {
+          announce.style.display = 'none';
+        }, 2000);
+      }
+
+      // HEAD BOB COMPONENT
+      AFRAME.registerComponent('head-bob', {
+        schema: {
+          enabled: { default: true }
+        },
+        init: function () {
+          this.speed = 0;
+          this.bobTime = 0;
+        },
+        tick: function (time, delta) {
+          const rig = document.querySelector('#rig');
+          const velocity = rig.components['movement-controls'].velocity;
+          this.speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+
+          if (this.speed > 0.1) {
+            this.bobTime += delta * 0.01;
+            const bobY = Math.sin(this.bobTime) * 0.03;
+            const bobX = Math.cos(this.bobTime * 0.5) * 0.015;
+            this.el.object3D.position.y = 1.6 + bobY;
+            this.el.object3D.position.x = bobX;
+          } else {
+            this.bobTime = 0;
+            this.el.object3D.position.y = 1.6;
+            this.el.object3D.position.x = 0;
+          }
+        }
+      });
+
+      // GAME LOGIC COMPONENT
+      AFRAME.registerComponent('game-logic', {
+        init: function () {
+          this.gun = document.querySelector('#gun-entity');
+          this.cam = document.querySelector('[camera]');
+          this.ray = document.querySelector('[raycaster]');
+          this.rig = document.querySelector('#rig');
+          this.muzzleFlash = document.querySelector('#muzzle-flash');
+          this.muzzleLight = document.querySelector('#muzzle-light');
+          this.canShoot = true;
+
+          updateAmmoDisplay();
+          updateHealthBar();
+          updatePointsDisplay();
+
+          // Movement controls
+          window.addEventListener('keydown', (e) => {
+            if (e.key === '1') this.switchWeapon(0);
+            if (e.key === '2') this.switchWeapon(1);
+            if (e.key === '3') this.switchWeapon(2);
+            if (e.key === 'Shift') {
+              this.rig.setAttribute('movement-controls', 'speed', 0.4); // Sprint
+            }
+            if (e.key === 'r' || e.key === 'R') {
+              this.reload();
+            }
+          });
+
+          window.addEventListener('keyup', (e) => {
+            if (e.key === 'Shift') {
+              this.rig.setAttribute('movement-controls', 'speed', 0.2); // Walk
+            }
+          });
+
+          // Combat controls
+          window.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+              // Check if clicking on a buyable/interactable item
+              if (hoveredBuyable) {
+                if (hoveredBuyable.el.components['wall-buy']) {
+                  hoveredBuyable.purchase();
+                } else if (hoveredBuyable.el.components['mystery-box']) {
+                  if (hoveredBuyable.selectedWeapon === -1) {
+                    hoveredBuyable.spin();
+                  } else {
+                    hoveredBuyable.takeWeapon();
+                  }
+                } else if (hoveredBuyable.el.components['hidden-relic']) {
+                  hoveredBuyable.collect();
+                } else if (hoveredBuyable.el.components['reward-weapon']) {
+                  hoveredBuyable.collect();
+                }
+              } else {
+                this.shoot();
+              }
+            }
+            if (e.button === 2) this.toggleADS(true);
+          });
+
+          window.addEventListener('mouseup', (e) => {
+            if (e.button === 2) this.toggleADS(false);
+          });
+
+          window.addEventListener('contextmenu', e => e.preventDefault());
+        },
+
+        switchWeapon: function(i) {
+          if (isReloading) return;
+          weaponIdx = i;
+          let w = weaponLoadout[i];
+          this.gun.setAttribute('gltf-model', w.model);
+          this.gun.setAttribute('position', isADS ? w.ads : w.hip);
+          this.gun.setAttribute('rotation', isADS ? w.adsRot : w.hipRot);
+          this.gun.setAttribute('scale', w.scale);
+          document.querySelector('#cur-weapon').innerHTML = w.name;
+          updateAmmoDisplay();
+          document.getElementById('sound-switch').play();
+        },
+
+        reload: function() {
+          if (isReloading) return;
+          const weapon = weaponLoadout[weaponIdx];
+          if (weapon.ammo >= weapon.maxAmmo) return;
+
+          isReloading = true;
+          document.getElementById('reload-text').style.display = 'block';
+          document.getElementById('sound-reload').play();
+
+          setTimeout(() => {
+            weapon.ammo = weapon.maxAmmo;
+            updateAmmoDisplay();
+            isReloading = false;
+            document.getElementById('reload-text').style.display = 'none';
+          }, weapon.reloadTime);
+        },
+
+        toggleADS: function(active) {
+          if (isReloading) return;
+          isADS = active;
+          let w = weaponLoadout[weaponIdx];
+
+          // Smooth weapon position transition
+          this.gun.setAttribute('animation__pos', {
+            property: 'position',
+            to: active ? w.ads : w.hip,
+            dur: 150,
+            easing: 'easeInOutQuad'
+          });
+
+          // Smooth weapon rotation transition (align scope to center)
+          this.gun.setAttribute('animation__rot', {
+            property: 'rotation',
+            to: active ? w.adsRot : w.hipRot,
+            dur: 150,
+            easing: 'easeInOutQuad'
+          });
+
+          // Dynamic FOV zoom
+          this.cam.setAttribute('animation__fov', {
+            property: 'camera.fov',
+            to: active ? 35 : 80,
+            dur: 150,
+            easing: 'easeInOutQuad'
+          });
+
+          document.getElementById('scope').style.display = active ? 'block' : 'none';
+        },
+
+        shoot: function() {
+          if (isReloading || !this.canShoot) return;
+
+          const weapon = weaponLoadout[weaponIdx];
+
+          // Check ammo
+          if (weapon.ammo <= 0) {
+            document.getElementById('sound-empty').play();
+            this.reload();
+            return;
+          }
+
+          // Consume ammo (unless infinite from Easter egg)
+          if (!easterEggComplete || weapon.ammo < 9999) {
+            weapon.ammo--;
+          }
+          updateAmmoDisplay();
+
+          // Fire rate limiting
+          this.canShoot = false;
+          setTimeout(() => {
+            this.canShoot = true;
+          }, weapon.fireRate);
+
+          // Auto-reload on empty
+          if (weapon.ammo === 0) {
+            setTimeout(() => this.reload(), 300);
+          }
+
+          // Play shoot sound
+          document.getElementById('sound-shoot').play();
+
+          // CAMERA SHAKE (Recoil kick)
+          const currentRot = this.cam.getAttribute('rotation');
+          this.cam.setAttribute('animation__shake', {
+            property: 'rotation',
+            from: `${currentRot.x} ${currentRot.y} ${currentRot.z}`,
+            to: `${currentRot.x - 2} ${currentRot.y} ${currentRot.z}`,
+            dur: 50,
+            easing: 'easeOutQuad'
+          });
+          setTimeout(() => {
+            this.cam.setAttribute('animation__recover', {
+              property: 'rotation',
+              to: `${currentRot.x} ${currentRot.y} ${currentRot.z}`,
+              dur: 100,
+              easing: 'easeInOutQuad'
+            });
+          }, 50);
+
+          // RECOIL ANIMATION
+          let currentPos = isADS ? weapon.ads : weapon.hip;
+          let posArray = currentPos.split(' ').map(Number);
+          let recoilPos = `${posArray[0]} ${posArray[1] - 0.05} ${posArray[2] + 0.1}`;
+
+          this.gun.setAttribute('animation__recoil', {
+            property: 'position',
+            from: currentPos,
+            to: recoilPos,
+            dur: 50,
+            easing: 'easeOutQuad'
+          });
+
+          setTimeout(() => {
+            this.gun.setAttribute('animation__recover', {
+              property: 'position',
+              to: currentPos,
+              dur: 100,
+              easing: 'easeInOutQuad'
+            });
+          }, 50);
+
+          // MUZZLE FLASH
+          this.muzzleFlash.setAttribute('visible', true);
+          this.muzzleLight.setAttribute('light', 'intensity', 2.0);
+          setTimeout(() => {
+            this.muzzleFlash.setAttribute('visible', false);
+            this.muzzleLight.setAttribute('light', 'intensity', 0);
+          }, 50);
+
+          // CAMERA-CENTER HITSCAN (Perfect Accuracy)
+          // Raycast from camera center exactly where crosshair points
+          const cameraWorldPos = new THREE.Vector3();
+          const cameraWorldDir = new THREE.Vector3();
+          this.cam.object3D.getWorldPosition(cameraWorldPos);
+          this.cam.object3D.getWorldDirection(cameraWorldDir);
+
+          // Create raycaster from camera center
+          const raycaster = new THREE.Raycaster(cameraWorldPos, cameraWorldDir);
+          raycaster.far = 100;
+
+          // Get all target entities
+          const targets = document.querySelectorAll('.target');
+          const targetObjects = [];
+          targets.forEach(t => {
+            if (t.object3D) {
+              t.object3D.traverse(node => {
+                if (node.isMesh) targetObjects.push(node);
+              });
+            }
+          });
+
+          // Perform raycast
+          const hits = raycaster.intersectObjects(targetObjects, true);
+
+          // Calculate hit point (where bullet should visually end)
+          let hitPoint;
+          let hitTarget = null;
+
+          if (hits.length > 0) {
+            hitPoint = hits[0].point;
+            // Find the entity that was hit
+            let hitObj = hits[0].object;
+            while (hitObj && !hitObj.el) {
+              hitObj = hitObj.parent;
+            }
+            if (hitObj && hitObj.el && hitObj.el.classList.contains('target')) {
+              hitTarget = hitObj.el;
+            }
+          } else {
+            // No hit - extend ray 100 meters forward
+            hitPoint = cameraWorldPos.clone().add(cameraWorldDir.multiplyScalar(100));
+          }
+
+          // VISUAL TRACER from gun barrel to hit point
+          let tracer = document.createElement('a-entity');
+          let barrelPos = new THREE.Vector3();
+          this.gun.object3D.getWorldPosition(barrelPos);
+
+          // Offset to actual barrel position
+          const offset = weapon.barrelOffset.split(' ').map(Number);
+          const barrelOffset = new THREE.Vector3(offset[0], offset[1], offset[2]);
+          barrelOffset.applyQuaternion(this.gun.object3D.quaternion);
+          barrelPos.add(barrelOffset);
+
+          tracer.setAttribute('line', {
+            start: barrelPos,
+            end: hitPoint,
+            color: 'yellow',
+            opacity: 0.8
+          });
+          this.el.sceneEl.appendChild(tracer);
+          setTimeout(() => tracer.parentNode.removeChild(tracer), 40);
+
+          // HIT DETECTION - Process the hit
+          if (hitTarget) {
+            this.damageZombie(hitTarget, weapon.damage);
+          }
+        },
+
+        damageZombie: function(zombie, damage) {
+          if (!zombie.health) zombie.health = 100;
+
+          zombie.health -= damage;
+
+          if (zombie.health <= 0) {
+            this.killZombie(zombie);
+            this.showHitmarker();
+            score += 100;
+            addPoints(100); // Earn points for kill
+            zombieCount--;
+            document.querySelector('#score-val').innerHTML = score;
+            document.getElementById('sound-hit').play();
+
+            // Check for wave completion
+            if (zombieCount <= 0 && wave > 0) {
+              setTimeout(() => startNewWave(), 3000);
+            }
+          }
+        },
+
+        killZombie: function(zombie) {
+          const pos = zombie.object3D.position;
+
+          // BLOOD BURST EFFECT - 5 red spheres flying outward
+          for (let i = 0; i < 5; i++) {
+            const blood = document.createElement('a-sphere');
+            const angle = (Math.PI * 2 * i) / 5;
+            const velocity = {
+              x: Math.cos(angle) * 2,
+              y: Math.random() * 2 + 1,
+              z: Math.sin(angle) * 2
+            };
+
+            blood.setAttribute('radius', '0.2');
+            blood.setAttribute('color', '#cc0000');
+            blood.setAttribute('position', { x: pos.x, y: pos.y + 1, z: pos.z });
+
+            // Animate blood particles
+            blood.setAttribute('animation__fly', {
+              property: 'position',
+              to: `${pos.x + velocity.x} ${pos.y + velocity.y} ${pos.z + velocity.z}`,
+              dur: 400,
+              easing: 'easeOutQuad'
+            });
+            blood.setAttribute('animation__shrink', {
+              property: 'scale',
+              to: '0 0 0',
+              dur: 400,
+              easing: 'easeInQuad'
+            });
+
+            this.el.sceneEl.appendChild(blood);
+            setTimeout(() => {
+              if (blood.parentNode) blood.parentNode.removeChild(blood);
+            }, 400);
+          }
+
+          // SOUL BOX CHARGING (if Easter egg stage 1 is active)
+          if (easterEggStage === 1) {
+            const soulBox = document.querySelector('#soul-box');
+            if (soulBox) {
+              const soulBoxPos = soulBox.object3D.position;
+              const distance = pos.distanceTo(soulBoxPos);
+
+              if (distance < 10) {
+                // Draw soul line from zombie to box
+                const soulLine = document.createElement('a-entity');
+                soulLine.setAttribute('line', {
+                  start: { x: pos.x, y: pos.y + 1, z: pos.z },
+                  end: { x: soulBoxPos.x, y: soulBoxPos.y + 1, z: soulBoxPos.z },
+                  color: '#ff0000',
+                  opacity: 0.8
+                });
+                this.el.sceneEl.appendChild(soulLine);
+
+                setTimeout(() => {
+                  if (soulLine.parentNode) soulLine.parentNode.removeChild(soulLine);
+                }, 1000);
+
+                chargeSoulBox();
+              }
+            }
+          }
+
+          // LOOT DROP CHANCE (10%)
+          if (Math.random() < 0.1) {
+            const lootType = Math.random() < 0.5 ? 'ammo' : 'points';
+            const loot = document.createElement('a-box');
+
+            loot.setAttribute('position', { x: pos.x, y: 1, z: pos.z });
+            loot.setAttribute('scale', '0.5 0.5 0.5');
+            loot.setAttribute('color', lootType === 'ammo' ? '#00ff00' : '#ffff00');
+            loot.setAttribute('loot-drop', `type: ${lootType}`);
+            loot.setAttribute('metalness', '0.8');
+            loot.setAttribute('roughness', '0.2');
+
+            this.el.sceneEl.appendChild(loot);
+
+            // Auto-remove after 30 seconds
+            setTimeout(() => {
+              if (loot.parentNode) loot.parentNode.removeChild(loot);
+            }, 30000);
+          }
+
+          // Visual death: fall over backwards
+          zombie.setAttribute('animation__fall', {
+            property: 'rotation',
+            to: '-90 0 0',
+            dur: 300,
+            easing: 'easeInQuad'
+          });
+          zombie.setAttribute('animation__sink', {
+            property: 'position',
+            to: `${pos.x} -2 ${pos.z}`,
+            dur: 500,
+            easing: 'easeInQuad'
+          });
+          setTimeout(() => {
+            if (zombie.parentNode) {
+              zombie.parentNode.removeChild(zombie);
+            }
+          }, 500);
+        },
+
+        showHitmarker: function() {
+          const hitmarker = document.getElementById('hitmarker');
+          hitmarker.style.display = 'block';
+          setTimeout(() => {
+            hitmarker.style.display = 'none';
+          }, 100);
+        }
+      });
+
+      // ZOMBIE AI COMPONENT (with obstacle avoidance)
+      AFRAME.registerComponent('zombie-ai', {
+        init: function() {
+          this.baseSpeed = 0.02 + (wave * 0.005); // Speed increases with waves
+          this.speed = this.baseSpeed + Math.random() * 0.01;
+          this.damageTimer = 0;
+          this.damageInterval = 1000; // Damage every second
+          this.stuckTimer = 0;
+          this.lastPos = new THREE.Vector3();
+        },
+        tick: function(time, delta) {
+          let player = document.querySelector('#rig').object3D.position;
+          let me = this.el.object3D.position;
+          let angle = Math.atan2(player.x - me.x, player.z - me.z);
+
+          // Rotate to face player
+          this.el.object3D.rotation.y = angle;
+
+          // Calculate next position
+          let nextX = me.x + Math.sin(angle) * this.speed;
+          let nextZ = me.z + Math.cos(angle) * this.speed;
+
+          // Simple obstacle avoidance - check if stuck
+          if (this.lastPos.distanceTo(me) < 0.01) {
+            this.stuckTimer += delta;
+            if (this.stuckTimer > 500) {
+              // Add random offset to get unstuck
+              angle += (Math.random() - 0.5) * Math.PI / 2;
+              nextX = me.x + Math.sin(angle) * this.speed * 2;
+              nextZ = me.z + Math.cos(angle) * this.speed * 2;
+              this.stuckTimer = 0;
+            }
+          } else {
+            this.stuckTimer = 0;
+          }
+
+          this.lastPos.copy(me);
+
+          // Move toward player
+          this.el.object3D.position.x = nextX;
+          this.el.object3D.position.z = nextZ;
+
+          // Damage player if close
+          let distance = me.distanceTo(player);
+          if (distance < 2.0) {
+            this.damageTimer += delta;
+            if (this.damageTimer >= this.damageInterval) {
+              takeDamage(10);
+              this.damageTimer = 0;
+            }
+          }
+        }
+      });
+
+      // SUPPLY DROP COMPONENT
+      AFRAME.registerComponent('supply-drop', {
+        init: function() {
+          this.falling = true;
+        },
+        tick: function() {
+          if (this.falling) {
+            let pos = this.el.object3D.position;
+            if (pos.y > 0.5) {
+              pos.y -= 0.05;
+            } else {
+              this.falling = false;
+              pos.y = 0.5;
+
+              // Check if player is near
+              let player = document.querySelector('#rig').object3D.position;
+              let distance = pos.distanceTo(player);
+              if (distance < 3) {
+                this.collect();
+              }
+            }
+          } else {
+            // Check for collection
+            let player = document.querySelector('#rig').object3D.position;
+            let distance = this.el.object3D.position.distanceTo(player);
+            if (distance < 3) {
+              this.collect();
+            }
+          }
+        },
+        collect: function() {
+          // Refill all ammo
+          weaponLoadout.forEach(w => w.ammo = w.maxAmmo);
+          updateAmmoDisplay();
+
+          // Heal player
+          health = Math.min(100, health + 50);
+          updateHealthBar();
+
+          document.getElementById('sound-pickup').play();
+          this.el.parentNode.removeChild(this.el);
+        }
+      });
+
+      // WALL BUY COMPONENT
+      AFRAME.registerComponent('wall-buy', {
+        schema: {
+          price: { type: 'number', default: 500 },
+          weaponID: { type: 'number', default: 0 }
+        },
+        init: function() {
+          this.isLookingAt = false;
+          this.cam = document.querySelector('[camera]');
+        },
+        tick: function() {
+          // Check if player is looking at this wall buy
+          const raycaster = this.cam.components.raycaster;
+          if (raycaster && raycaster.intersections.length > 0) {
+            const hit = raycaster.intersections[0];
+            if (hit.object.el === this.el) {
+              this.isLookingAt = true;
+              hoveredBuyable = this;
+              const weapon = weaponLoadout[this.data.weaponID];
+              document.getElementById('buy-prompt').innerHTML =
+                `[CLICK] ${weapon.name}<br>$${this.data.price}`;
+              document.getElementById('buy-prompt').style.display = 'block';
+              return;
+            }
+          }
+          if (this.isLookingAt) {
+            this.isLookingAt = false;
+            if (hoveredBuyable === this) {
+              hoveredBuyable = null;
+              document.getElementById('buy-prompt').style.display = 'none';
+            }
+          }
+        },
+        purchase: function() {
+          if (spendPoints(this.data.price)) {
+            const gameLogic = document.querySelector('[game-logic]').components['game-logic'];
+            gameLogic.switchWeapon(this.data.weaponID);
+            document.getElementById('sound-pickup').play();
+          } else {
+            // Not enough money sound
+            document.getElementById('sound-empty').play();
+          }
+        }
+      });
+
+      // MYSTERY BOX COMPONENT
+      AFRAME.registerComponent('mystery-box', {
+        schema: {
+          price: { type: 'number', default: 950 }
+        },
+        init: function() {
+          this.isLookingAt = false;
+          this.isSpinning = false;
+          this.spinTime = 0;
+          this.selectedWeapon = -1;
+          this.cam = document.querySelector('[camera]');
+          this.light = this.el.querySelector('[light]');
+          this.weaponDisplay = this.el.querySelector('.box-weapon');
+        },
+        tick: function(time, delta) {
+          // Check if player is looking at the box
+          const raycaster = this.cam.components.raycaster;
+          if (!this.isSpinning && raycaster && raycaster.intersections.length > 0) {
+            const hit = raycaster.intersections[0];
+            if (hit.object.el === this.el || hit.object.el.parentNode === this.el) {
+              this.isLookingAt = true;
+              hoveredBuyable = this;
+              if (this.selectedWeapon === -1) {
+                document.getElementById('buy-prompt').innerHTML =
+                  `[CLICK] Mystery Box<br>$${this.data.price}`;
+              } else {
+                document.getElementById('buy-prompt').innerHTML =
+                  `[CLICK] Take ${weaponLoadout[this.selectedWeapon].name}`;
+              }
+              document.getElementById('buy-prompt').style.display = 'block';
+            } else if (this.isLookingAt) {
+              this.isLookingAt = false;
+              if (hoveredBuyable === this) {
+                hoveredBuyable = null;
+                document.getElementById('buy-prompt').style.display = 'none';
+              }
+            }
+          }
+
+          // Handle spinning animation
+          if (this.isSpinning) {
+            this.spinTime += delta;
+
+            // Cycle through weapons
+            const cycleSpeed = Math.min(200, this.spinTime / 10); // Slow down over time
+            if (time % cycleSpeed < delta) {
+              const randomIdx = Math.floor(Math.random() * weaponLoadout.length);
+              this.weaponDisplay.setAttribute('gltf-model', weaponLoadout[randomIdx].model);
+            }
+
+            // Stop after 3 seconds
+            if (this.spinTime >= 3000) {
+              this.isSpinning = false;
+              this.spinTime = 0;
+              this.selectedWeapon = Math.floor(Math.random() * weaponLoadout.length);
+              this.weaponDisplay.setAttribute('gltf-model', weaponLoadout[this.selectedWeapon].model);
+              this.light.setAttribute('light', 'intensity', 0.5);
+            }
+          }
+        },
+        spin: function() {
+          if (this.isSpinning) return;
+
+          if (spendPoints(this.data.price)) {
+            this.isSpinning = true;
+            this.selectedWeapon = -1;
+            this.light.setAttribute('light', 'intensity', 2.0);
+            document.getElementById('sound-pickup').play();
+          } else {
+            document.getElementById('sound-empty').play();
+          }
+        },
+        takeWeapon: function() {
+          if (this.selectedWeapon !== -1) {
+            const gameLogic = document.querySelector('[game-logic]').components['game-logic'];
+            gameLogic.switchWeapon(this.selectedWeapon);
+            this.selectedWeapon = -1;
+            this.weaponDisplay.setAttribute('visible', false);
+            setTimeout(() => {
+              this.weaponDisplay.setAttribute('visible', true);
+            }, 500);
+          }
+        }
+      });
+
+      // HIDDEN RELIC COMPONENT
+      AFRAME.registerComponent('hidden-relic', {
+        schema: {
+          relicNum: { type: 'number', default: 1 }
+        },
+        init: function() {
+          this.found = false;
+          this.isLookingAt = false;
+          this.cam = document.querySelector('[camera]');
+
+          // Subtle glow animation
+          this.el.setAttribute('animation', {
+            property: 'components.material.material.emissiveIntensity',
+            from: 0.2,
+            to: 0.8,
+            dir: 'alternate',
+            loop: true,
+            dur: 2000,
+            easing: 'easeInOutQuad'
+          });
+        },
+        tick: function() {
+          if (this.found) return;
+
+          const raycaster = this.cam.components.raycaster;
+          if (raycaster && raycaster.intersections.length > 0) {
+            const hit = raycaster.intersections[0];
+            if (hit.object.el === this.el) {
+              this.isLookingAt = true;
+              hoveredBuyable = this;
+              document.getElementById('buy-prompt').innerHTML =
+                `[CLICK] Hidden Relic ${this.data.relicNum}/3`;
+              document.getElementById('buy-prompt').style.display = 'block';
+            } else if (this.isLookingAt) {
+              this.isLookingAt = false;
+              if (hoveredBuyable === this) {
+                hoveredBuyable = null;
+                document.getElementById('buy-prompt').style.display = 'none';
+              }
+            }
+          }
+        },
+        collect: function() {
+          if (this.found) return;
+          this.found = true;
+          findRelic(this.data.relicNum);
+          document.getElementById('sound-pickup').play();
+
+          // Disappear with animation
+          this.el.setAttribute('animation__shrink', {
+            property: 'scale',
+            to: '0 0 0',
+            dur: 500,
+            easing: 'easeInQuad'
+          });
+          setTimeout(() => {
+            if (this.el.parentNode) this.el.parentNode.removeChild(this.el);
+          }, 500);
+        }
+      });
+
+      // SOUL BOX COMPONENT
+      AFRAME.registerComponent('soul-box', {
+        init: function() {
+          this.activated = false;
+          this.opened = false;
+          this.light = this.el.querySelector('[light]');
+          this.rewardWeapon = this.el.querySelector('.reward-weapon');
+        },
+        activate: function() {
+          this.activated = true;
+          this.light.setAttribute('light', 'intensity', 2.0);
+          this.light.setAttribute('light', 'color', '#ff0000');
+        },
+        tick: function() {
+          if (!this.activated || this.opened) return;
+
+          // Check for nearby zombie kills and draw soul lines
+          // This will be handled in the killZombie function
+        },
+        openBox: function() {
+          this.opened = true;
+
+          // Box opening animation
+          this.el.setAttribute('animation__open', {
+            property: 'rotation',
+            to: '0 720 0',
+            dur: 2000,
+            easing: 'easeOutElastic'
+          });
+
+          // Show reward weapon
+          if (this.rewardWeapon) {
+            this.rewardWeapon.setAttribute('visible', true);
+            this.rewardWeapon.setAttribute('animation__rise', {
+              property: 'position',
+              to: '0 2 0',
+              dur: 1000,
+              easing: 'easeOutQuad'
+            });
+          }
+
+          // Change light to gold
+          this.light.setAttribute('light', 'color', '#ffd700');
+          this.light.setAttribute('light', 'intensity', 3.0);
+        }
+      });
+
+      // REWARD WEAPON COMPONENT
+      AFRAME.registerComponent('reward-weapon', {
+        init: function() {
+          this.collected = false;
+          this.cam = document.querySelector('[camera]');
+          this.isLookingAt = false;
+        },
+        tick: function() {
+          if (this.collected || !easterEggComplete) return;
+
+          const player = document.querySelector('#rig').object3D.position;
+          const distance = this.el.object3D.position.distanceTo(player);
+
+          if (distance < 3) {
+            const raycaster = this.cam.components.raycaster;
+            if (raycaster && raycaster.intersections.length > 0) {
+              const hit = raycaster.intersections[0];
+              if (hit.object.el === this.el || hit.object.el.parentNode === this.el) {
+                this.isLookingAt = true;
+                hoveredBuyable = this;
+                document.getElementById('buy-prompt').innerHTML =
+                  `[CLICK] GOLDEN DESTROYER<br>INFINITE AMMO`;
+                document.getElementById('buy-prompt').style.display = 'block';
+              } else if (this.isLookingAt) {
+                this.isLookingAt = false;
+                if (hoveredBuyable === this) {
+                  hoveredBuyable = null;
+                  document.getElementById('buy-prompt').style.display = 'none';
+                }
+              }
+            }
+          }
+        },
+        collect: function() {
+          if (this.collected) return;
+          this.collected = true;
+
+          // Grant super weapon stats
+          const currentWeapon = weaponLoadout[weaponIdx];
+          currentWeapon.fireRate = 100;
+          currentWeapon.damage = 200;
+          currentWeapon.ammo = 9999;
+          currentWeapon.maxAmmo = 9999;
+
+          // Add gold material to gun
+          const gun = document.querySelector('#gun-entity');
+          gun.setAttribute('animation__gold', {
+            property: 'components.gltf-model.model.traverse',
+            dur: 1000
+          });
+
+          updateAmmoDisplay();
+          screenFlash();
+          document.getElementById('sound-pickup').play();
+
+          // Remove weapon from scene
+          this.el.parentNode.removeChild(this.el);
+        }
+      });
+
+      // LOOT DROP COMPONENT
+      AFRAME.registerComponent('loot-drop', {
+        schema: {
+          type: { type: 'string', default: 'ammo' } // 'ammo' or 'points'
+        },
+        init: function() {
+          this.collected = false;
+          // Spinning animation
+          this.el.setAttribute('animation', {
+            property: 'rotation',
+            to: '0 360 0',
+            loop: true,
+            dur: 2000,
+            easing: 'linear'
+          });
+          // Bobbing animation
+          const startY = this.el.getAttribute('position').y;
+          this.el.setAttribute('animation__bob', {
+            property: 'position',
+            to: `${this.el.getAttribute('position').x} ${startY + 0.3} ${this.el.getAttribute('position').z}`,
+            dir: 'alternate',
+            loop: true,
+            dur: 1000,
+            easing: 'easeInOutQuad'
+          });
+        },
+        tick: function() {
+          if (this.collected) return;
+
+          const player = document.querySelector('#rig').object3D.position;
+          const distance = this.el.object3D.position.distanceTo(player);
+
+          if (distance < 2) {
+            this.collect();
+          }
+        },
+        collect: function() {
+          if (this.collected) return;
+          this.collected = true;
+
+          if (this.data.type === 'ammo') {
+            // MAX AMMO
+            weaponLoadout.forEach(w => w.ammo = w.maxAmmo);
+            updateAmmoDisplay();
+          } else if (this.data.type === 'points') {
+            // BONUS POINTS
+            addPoints(500);
+          }
+
+          document.getElementById('sound-pickup').play();
+          this.el.parentNode.removeChild(this.el);
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="ui">
+      SCORE: <span id="score-val">0</span> |
+      WEAPON: <span id="cur-weapon">Assault Rifle</span> |
+      WAVE: <span id="wave-num">1</span>
+    </div>
+    <div id="points-display">$500</div>
+    <div id="health-bar-container">
+      <div id="health-bar"></div>
+    </div>
+    <div id="ammo-display">30 / 30</div>
+    <div id="reload-text">RELOADING...</div>
+    <div id="buy-prompt"></div>
+    <div id="scope">
+      <div id="crosshair"></div>
+    </div>
+    <div id="hitmarker"></div>
+    <div id="wave-announce"></div>
+    <div id="screen-flash"></div>
+    <div id="easter-egg-icons">
+      <div class="relic-icon" id="relic-icon-1"></div>
+      <div class="relic-icon" id="relic-icon-2"></div>
+      <div class="relic-icon" id="relic-icon-3"></div>
+    </div>
+
+    <!-- AUDIO PLACEHOLDERS (Add your MP3s here) -->
+    <audio id="sound-shoot" src=""></audio>
+    <audio id="sound-reload" src=""></audio>
+    <audio id="sound-empty" src=""></audio>
+    <audio id="sound-hit" src=""></audio>
+    <audio id="sound-damage" src=""></audio>
+    <audio id="sound-switch" src=""></audio>
+    <audio id="sound-wave" src=""></audio>
+    <audio id="sound-pickup" src=""></audio>
+
+    <a-scene
+      game-logic
+      renderer="colorManagement: true; antialias: false"
+      fog="type: linear; color: #000; near: 10; far: 50">
+
+      <a-assets>
+        <a-asset-item id="assault-rifle" src="assault_rifle.glb"></a-asset-item>
+        <a-asset-item id="zombie-walker" src="zombie_walker.glb"></a-asset-item>
+        <a-asset-item id="zombie-horde" src="zombie_horde.glb"></a-asset-item>
+      </a-assets>
+
+      <!-- PLAYER RIG WITH PRO MOVEMENT -->
+      <a-entity id="rig" movement-controls="speed: 0.2; fly: false; acceleration: 80">
+        <a-entity
+          camera
+          head-bob
+          look-controls="pointerLockEnabled: true"
+          position="0 1.6 0"
+          raycaster="objects: .target, [wall-buy], [mystery-box], [hidden-relic], [reward-weapon]; far: 100">
+
+          <!-- FLASHLIGHT SPOTLIGHT -->
+          <a-entity
+            light="type: spot; intensity: 1.5; angle: 45; penumbra: 0.3; color: #fff; castShadow: false"
+            position="0 0 0">
+          </a-entity>
+
+          <!-- WEAPON ENTITY -->
+          <a-entity
+            id="gun-entity"
+            gltf-model="#assault-rifle"
+            position="0.3 -0.25 -0.5"
+            rotation="0 170 0"
+            scale="0.05 0.05 0.05">
+
+            <!-- MUZZLE FLASH -->
+            <a-sphere
+              id="muzzle-flash"
+              radius="0.1"
+              color="#ff8800"
+              position="0 0 -2"
+              visible="false">
+            </a-sphere>
+            <a-entity
+              id="muzzle-light"
+              light="type: point; intensity: 0; color: #ff8800; distance: 5; decay: 2"
+              position="0 0 -2">
+            </a-entity>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- ENVIRONMENT -->
+      <a-plane
+        rotation="-90 0 0"
+        width="1000"
+        height="1000"
+        color="#0a0a0a"
+        repeat="100 100"
+        roughness="0.9">
+      </a-plane>
+
+      <a-sky color="#000000"></a-sky>
+
+      <!-- AMBIENT LIGHT (LOW INTENSITY) -->
+      <a-entity light="type: ambient; intensity: 0.3; color: #444"></a-entity>
+
+      <!-- WALL BUY STATIONS -->
+      <!-- Assault Rifle Wall Buy -->
+      <a-entity position="10 1.5 0" rotation="0 -90 0">
+        <a-entity
+          gltf-model="#assault-rifle"
+          scale="2 2 2"
+          wall-buy="price: 500; weaponID: 0"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
+        </a-entity>
+        <a-text
+          value="ASSAULT RIFLE\n$500"
+          align="center"
+          position="0 -0.5 0"
+          color="#ffff00"
+          width="4">
+        </a-text>
+      </a-entity>
+
+      <!-- Zombie Walker Wall Buy -->
+      <a-entity position="-10 1.5 0" rotation="0 90 0">
+        <a-entity
+          gltf-model="#zombie-walker"
+          scale="3 3 3"
+          wall-buy="price: 1200; weaponID: 1"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
+        </a-entity>
+        <a-text
+          value="ZOMBIE WALKER\n$1200"
+          align="center"
+          position="0 -0.5 0"
+          color="#ffff00"
+          width="4">
+        </a-text>
+      </a-entity>
+
+      <!-- HIDDEN RELICS (Easter Egg Stage 1) -->
+      <!-- Relic 1: Behind the spawn area, far edge of map -->
+      <a-sphere
+        position="0 0.5 45"
+        radius="0.3"
+        color="#ffd700"
+        metalness="1"
+        roughness="0"
+        material="emissive: #ffd700; emissiveIntensity: 0.5"
+        hidden-relic="relicNum: 1">
+      </a-sphere>
+
+      <!-- Relic 2: High up in the air, player must look up -->
+      <a-sphere
+        position="15 8 -10"
+        radius="0.3"
+        color="#ffd700"
+        metalness="1"
+        roughness="0"
+        material="emissive: #ffd700; emissiveIntensity: 0.5"
+        hidden-relic="relicNum: 2">
+      </a-sphere>
+
+      <!-- Relic 3: Partially hidden under the floor -->
+      <a-sphere
+        position="-12 -0.3 8"
+        radius="0.3"
+        color="#ffd700"
+        metalness="1"
+        roughness="0"
+        material="emissive: #ffd700; emissiveIntensity: 0.5"
+        hidden-relic="relicNum: 3">
+      </a-sphere>
+
+      <!-- SOUL BOX (Easter Egg Stage 2) - Hidden until stage 1 complete -->
+      <a-entity id="soul-box" position="20 0 20" visible="false" soul-box>
+        <a-box
+          color="#660000"
+          width="2"
+          height="2"
+          depth="2"
+          metalness="0.9"
+          roughness="0.1"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
+        </a-box>
+        <a-entity
+          light="type: point; intensity: 0; color: #ff0000; distance: 15"
+          position="0 1 0">
+        </a-entity>
+        <a-text
+          value="SOUL BOX"
+          align="center"
+          position="0 1.5 0"
+          color="#ff0000"
+          width="4">
+        </a-text>
+        <!-- Reward Weapon (appears when box opens) -->
+        <a-entity
+          class="reward-weapon"
+          gltf-model="#zombie-horde"
+          position="0 -2 0"
+          scale="4 4 4"
+          rotation="0 0 0"
+          visible="false"
+          reward-weapon
+          material="color: #ffd700; metalness: 1; roughness: 0"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear">
+        </a-entity>
+      </a-entity>
+
+      <!-- MYSTERY BOX -->
+      <a-entity position="0 0 -15" mystery-box="price: 950">
+        <a-box
+          color="#330066"
+          width="2"
+          height="1.5"
+          depth="2"
+          metalness="0.8"
+          roughness="0.2"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear">
+        </a-box>
+        <a-entity
+          class="box-weapon"
+          gltf-model="#zombie-horde"
+          position="0 1.2 0"
+          scale="2 2 2"
+          visible="true">
+        </a-entity>
+        <a-entity
+          light="type: point; intensity: 0.5; color: #ff00ff; distance: 10"
+          position="0 1 0">
+        </a-entity>
+        <a-text
+          value="MYSTERY BOX\n$950"
+          align="center"
+          position="0 -1.2 0"
+          color="#ff00ff"
+          width="4">
+        </a-text>
+      </a-entity>
+    </a-scene>
+
+    <script>
+      let spawnInterval = null;
+      let supplyDropInterval = null;
+
+      // ANTI-GRID ZOMBIE SPAWNER (Polar Coordinates with Wave System)
+      function startSpawning() {
+        if (spawnInterval) clearInterval(spawnInterval);
+
+        spawnInterval = setInterval(() => {
+          if (zombieCount >= maxZombies) return;
+
+          const scene = document.querySelector('a-scene');
+          const zombie = document.createElement('a-entity');
+
+          // Random angle (0-360 degrees) and distance (30-50 meters)
+          const angle = Math.random() * Math.PI * 2;
+          const distance = 30 + Math.random() * 20;
+
+          // Random model selection
+          const models = ["#zombie-walker", "#zombie-horde"];
+          const selectedModel = models[Math.floor(Math.random() * models.length)];
+
+          // Calculate position using polar coordinates
+          const x = Math.cos(angle) * distance;
+          const z = Math.sin(angle) * distance;
+
+          zombie.setAttribute('gltf-model', selectedModel);
+          zombie.setAttribute('class', 'target');
+          zombie.setAttribute('zombie-ai', '');
+          zombie.setAttribute('position', { x: x, y: 0, z: z });
+          zombie.setAttribute('scale', '1.2 1.2 1.2');
+          zombie.health = 100;
+
+          scene.appendChild(zombie);
+          zombieCount++;
+        }, spawnRate);
+      }
+
+      // SUPPLY DROP SYSTEM
+      function startSupplyDrops() {
+        supplyDropInterval = setInterval(() => {
+          const scene = document.querySelector('a-scene');
+          const drop = document.createElement('a-box');
+
+          // Random position near player
+          const player = document.querySelector('#rig').object3D.position;
+          const angle = Math.random() * Math.PI * 2;
+          const distance = 15 + Math.random() * 10;
+          const x = player.x + Math.cos(angle) * distance;
+          const z = player.z + Math.sin(angle) * distance;
+
+          drop.setAttribute('position', { x: x, y: 30, z: z });
+          drop.setAttribute('color', '#ff6600');
+          drop.setAttribute('width', '1.5');
+          drop.setAttribute('height', '1.5');
+          drop.setAttribute('depth', '1.5');
+          drop.setAttribute('supply-drop', '');
+          drop.setAttribute('animation', {
+            property: 'rotation',
+            to: '0 360 0',
+            loop: true,
+            dur: 2000,
+            easing: 'linear'
+          });
+
+          scene.appendChild(drop);
+        }, 30000); // Every 30 seconds
+      }
+
+      // ENVIRONMENT OBSTACLE SPAWNER
+      // When you download crate.glb and barrel.glb, add them to <a-assets> and uncomment this:
+      /*
+      function spawnObstacles() {
+        const scene = document.querySelector('a-scene');
+        const obstacleModels = ['#crate', '#barrel']; // Add these IDs to your <a-assets>
+
+        for (let i = 0; i < 50; i++) {
+          const obstacle = document.createElement('a-entity');
+          const angle = Math.random() * Math.PI * 2;
+          const distance = 10 + Math.random() * 40;
+          const x = Math.cos(angle) * distance;
+          const z = Math.sin(angle) * distance;
+
+          const model = obstacleModels[Math.floor(Math.random() * obstacleModels.length)];
+
+          obstacle.setAttribute('gltf-model', model);
+          obstacle.setAttribute('position', { x: x, y: 0, z: z });
+          obstacle.setAttribute('scale', '1.5 1.5 1.5');
+          obstacle.setAttribute('class', 'obstacle');
+
+          scene.appendChild(obstacle);
+        }
+      }
+      */
+
+      // START GAME
+      setTimeout(() => {
+        startSpawning();
+        startSupplyDrops();
+        // spawnObstacles(); // Uncomment when you have crate.glb and barrel.glb
+      }, 2000);
+    </script>
+  </body>
+</html>
