@@ -19,6 +19,7 @@ import sys
 import logging
 import argparse
 from pathlib import Path
+from typing import Optional, Tuple
 
 # config.py lives at workspace/ root, one level up from scripts/
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -37,7 +38,7 @@ logging.basicConfig(
 logger = logging.getLogger("VIP_FLASH")
 
 
-def find_edl_port(preferred_port: str) -> str | None:
+def find_edl_port(preferred_port: str) -> Optional[str]:
     """Scan for Qualcomm QDLoader 9008 device, return port name or None."""
     import serial.tools.list_ports
     # Try preferred port first
@@ -58,7 +59,7 @@ def find_edl_port(preferred_port: str) -> str | None:
     return None
 
 
-def upload_loader_with_fallback(port: str, use_vip: bool) -> tuple[object, object, str] | None:
+def upload_loader_with_fallback(port: str, use_vip: bool) -> Optional[Tuple[object, object, str]]:
     """
     Connect Sahara and upload loader. Returns (cdc, sahara_tool, mode) or None on failure.
     Tries stock loader first unless use_vip=True. Falls back to VIP loader on auth error.
@@ -190,7 +191,7 @@ def run_vip_flash(port: str, use_vip: bool, luns: list[int], dryrun: bool):
     fh.printgpt()
 
     # Flash each LUN
-    results = {}
+    results = {}  # type: dict
     for lun in luns:
         results[lun] = flash_lun(fh, lun, payload_dir)
 
