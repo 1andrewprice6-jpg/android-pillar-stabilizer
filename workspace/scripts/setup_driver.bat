@@ -29,32 +29,24 @@ echo.
 echo ============================================================
 echo.
 
-:: Try to find Zadig in common locations
+:: Check bundled Zadig first (extracted from edl-master.zip)
 set ZADIG_PATH=
-if exist "C:\Program Files\Zadig\zadig.exe" set ZADIG_PATH=C:\Program Files\Zadig\zadig.exe
-if exist "%LOCALAPPDATA%\Microsoft\WinGet\Packages\Akeo.Zadig_*\zadig.exe" (
-    for /f "delims=" %%i in ('dir /b /s "%LOCALAPPDATA%\Microsoft\WinGet\Packages\Akeo.Zadig_*\zadig.exe" 2^>nul') do set ZADIG_PATH=%%i
+if exist "C:\Users\Andrew Price\Desktop\edl\Drivers\Windows\zadig-2.8.exe" (
+    set ZADIG_PATH=C:\Users\Andrew Price\Desktop\edl\Drivers\Windows\zadig-2.8.exe
 )
-if exist "%ProgramFiles%\Zadig\zadig.exe" set ZADIG_PATH=%ProgramFiles%\Zadig\zadig.exe
 
-:: Also check PATH
-where zadig.exe >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    for /f "delims=" %%i in ('where zadig.exe') do set ZADIG_PATH=%%i
+:: Fallback locations
+if not defined ZADIG_PATH if exist "C:\Program Files\Zadig\zadig.exe" set ZADIG_PATH=C:\Program Files\Zadig\zadig.exe
+if not defined ZADIG_PATH (
+    where zadig.exe >nul 2>&1
+    if %ERRORLEVEL% EQU 0 for /f "delims=" %%i in ('where zadig.exe') do set ZADIG_PATH=%%i
 )
 
 if defined ZADIG_PATH (
-    echo [INFO] Found Zadig at: %ZADIG_PATH%
-    echo [INFO] Launching Zadig...
+    echo [INFO] Launching Zadig: %ZADIG_PATH%
     start "" "%ZADIG_PATH%"
 ) else (
-    echo [WARN] Zadig not found in standard locations.
-    echo.
-    echo  To install Zadig:
-    echo    winget install akeo.ie.Zadig
-    echo.
-    echo  Or download from: https://zadig.akeo.ie/
-    echo  Run: install_edl_win10_win11.ps1 (in Desktop\edl\) to auto-install.
+    echo [WARN] Zadig not found. Run: winget install akeo.ie.Zadig
 )
 
 echo.
