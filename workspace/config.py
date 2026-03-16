@@ -8,6 +8,9 @@ PROJECT_ROOT = WORKSPACE_DIR.parent
 # External paths (update these if the environment changes)
 EDL_REPO_PATH = Path(r"C:\Users\Andrew Price\Lazarus_11\edl_repo")
 
+# bkerler edl repo on Desktop (has VIP-bypass loaders in Loaders/oppo/)
+EDL_BKERLER_PATH = Path(r"C:\Users\Andrew Price\Desktop\edl")
+
 # Primary firmware source: OP11-AUTO-RECOVER flash_ready (complete, all 6 UFS LUNs)
 FIRMWARE_ROOT = Path(r"C:\Users\Andrew Price\OP11-AUTO-RECOVER\flash_ready")
 
@@ -16,7 +19,18 @@ FIRMWARE_ROOT_ALT = Path(r"C:\Users\Andrew Price\Desktop\CPH2451export_11_15.0.0
 
 # Device Configuration
 PORT = "COM7"
+
+# Loader selection:
+#   LOADER_PATH       - stock SM8550 loader from firmware package (1.6MB, Qualcomm-signed)
+#   VIP_LOADER_PATH   - bkerler oppo VIP-bypass loader (948KB, bypasses Oppo auth check)
+# SM8550 (Snapdragon 8 Gen 2) requires a valid signed loader; use stock unless it fails auth.
+# If stock loader returns VIP/auth error, switch to VIP_LOADER_PATH.
 LOADER_PATH = FIRMWARE_ROOT / "prog_firehose_ddr.elf"
+VIP_LOADER_PATH = EDL_BKERLER_PATH / "Loaders" / "oppo" / "prog_firehose_ddr.elf"
+
+# Set USE_VIP_LOADER = True to force the VIP-bypass loader (bkerler oppo)
+USE_VIP_LOADER = False
+ACTIVE_LOADER = VIP_LOADER_PATH if USE_VIP_LOADER else LOADER_PATH
 
 # CPH2451 UFS LUN map (SM8550 / Snapdragon 8 Gen 2)
 # LUN0: userdata, super, persist, GPT
@@ -45,6 +59,16 @@ FIREHOSE_ARGS = {
     "<patch>": "patch0.xml",
     "<imagedir>": str(FIRMWARE_ROOT)
 }
+
+def get_active_loader():
+    """Return the active loader path, preferring VIP loader if USE_VIP_LOADER is set."""
+    loader = ACTIVE_LOADER
+    if not loader.exists():
+        # Fallback chain: VIP -> stock -> error
+        if loader == VIP_LOADER_PATH and LOADER_PATH.exists():
+            return LOADER_PATH
+        raise FileNotFoundError(f"Loader not found: {loader}")
+    return loader
 
 def setup_env():
     import sys
