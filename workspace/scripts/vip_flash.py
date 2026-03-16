@@ -93,10 +93,32 @@ def upload_loader_with_fallback(port: str, use_vip: bool) -> Optional[Tuple[obje
             continue
 
         mode = res.get("mode", "error")
+        logger.info(f"Sahara connect response: mode={mode} cmd={res.get('cmd')}")
+
+        if mode == "firehose":
+            logger.info(f"Already in firehose ({loader_label} loader)")
+            return cdc, sahara_tool, mode
 
         if mode == "sahara" and res.get("cmd") == cmd_t.SAHARA_HELLO_REQ:
-            mode = sahara_tool.upload_loader(version=2)
-            logger.info(f"Loader upload result: {mode}")
+            # SM8550 uses Sahara v3; try v3 first, fall back to v2
+            for sahara_version in [3, 2]:
+                logger.info(f"Trying Sahara protocol version {sahara_version}...")
+                mode = sahara_tool.upload_loader(version=sahara_version)
+                logger.info(f"upload_loader(v{sahara_version}) result: {mode}")
+                if mode == "firehose":
+                    break
+                # Reconnect before retrying with different version
+                if sahara_version != 2:
+                    cdc.close()
+                    cdc = serial_class(loglevel=logging.INFO)
+                    if not cdc.connect(portname=f"\\\\.\\{port}"):
+                        logger.error(f"Reconnect failed on {port}")
+                        break
+                    sahara_tool = sahara(cdc, loglevel=logging.INFO)
+                    sahara_tool.programmer = str(loader_path)
+                    res = sahara_tool.connect()
+                    if not res or res.get("mode") != "sahara":
+                        break
 
         if mode == "firehose":
             logger.info(f"Firehose mode active ({loader_label} loader)")

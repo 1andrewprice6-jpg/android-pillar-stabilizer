@@ -18,7 +18,7 @@ FIRMWARE_ROOT = Path(r"C:\Users\Andrew Price\OP11-AUTO-RECOVER\flash_ready")
 FIRMWARE_ROOT_ALT = Path(r"C:\Users\Andrew Price\Desktop\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\op11\IMAGES")
 
 # Device Configuration
-PORT = "COM7"
+PORT = "COM5"
 
 # Loader selection:
 #   LOADER_PATH       - stock SM8550 loader from firmware package (1.6MB, Qualcomm-signed)
