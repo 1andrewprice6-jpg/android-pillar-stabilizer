@@ -96,19 +96,6 @@ if %ERRORLEVEL% EQU 0 (
     goto :DONE
 )
 
-echo.
-echo [WARN] Standard flash failed. Retrying with VIP-bypass loader...
-echo.
-python "%~dp0vip_flash.py" --vip --lun all
-if %ERRORLEVEL% EQU 0 (
-    echo.
-    echo ============================================================
-    echo  VIP FLASH COMPLETE - DEVICE FLASHED SUCCESSFULLY
-    echo  Disconnect USB, wait 10 seconds, reconnect. Device will boot.
-    echo ============================================================
-    goto :DONE
-)
-
 :ERROR
 echo.
 echo ============================================================
