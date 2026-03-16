@@ -11,6 +11,12 @@ EDL_REPO_PATH = Path(r"C:\Users\Andrew Price\Lazarus_11\edl_repo")
 # bkerler edl repo on Desktop (has VIP-bypass loaders in Loaders/oppo/)
 EDL_BKERLER_PATH = Path(r"C:\Users\Andrew Price\Desktop\edl")
 
+# bkerler/Loaders repo - device-specific Firehose loaders keyed by HWID+pkhash
+# Clone with: workspace\scripts\setup_loaders.bat
+# Repo: https://github.com/bkerler/Loaders.git
+# loader_db.py auto-scans EDL_BKERLER_PATH/Loaders/ for the right SM8550 loader
+LOADERS_DB_PATH = EDL_BKERLER_PATH / "Loaders" / "bkerler"
+
 # Primary firmware source: OP11-AUTO-RECOVER flash_ready (complete, all 6 UFS LUNs)
 FIRMWARE_ROOT = Path(r"C:\Users\Andrew Price\OP11-AUTO-RECOVER\flash_ready")
 
