@@ -519,10 +519,17 @@ class MainWindow:
         self.log_message("Flash loader via EDL (Sahara)...")
         loader = filedialog.askopenfilename(
             title='Select firehose loader',
-            filetypes=[('ELF/BIN loader', '*.elf *.bin'), ('All files', '*.*')]
+            filetypes=[('ELF/BIN loader', '*.elf *.bin'), ('All files', '*.*')],
+            initialdir=r'C:\Users\Andrew Price\firmware'
         )
         if not loader:
             return
+        
+        # Check if we should use the Orchestrator for full recovery
+        if messagebox.askyesno("Full Recovery", "Do you want to run the full Recovery Orchestrator sequence?\n(Recommended for unbricking)"):
+             self.run_orchestrator(loader)
+             return
+
         edl_port = self._find_edl_port()
         if not edl_port:
             messagebox.showerror('EDL Not Found',
@@ -537,6 +544,46 @@ class MainWindow:
             f'--loader="{loader}" --serial --portname="\\\\.\\{edl_port}"'
         )
         self._run_streaming(cmd, label=f"Load {os.path.basename(loader)} via Sahara")
+
+    def run_orchestrator(self, loader_path):
+        """Run the RecoveryOrchestrator in a separate thread"""
+        firmware_dir = os.path.dirname(loader_path)
+        self.log_message(f"Starting Recovery Orchestrator in: {firmware_dir}")
+        
+        def worker():
+            try:
+                # Import here to avoid circular imports if any
+                import sys
+                
+                # Construct command to run the orchestrator script
+                # We run it as a subprocess to keep the GUI responsive and capture output
+                script_path = r'C:\Users\Andrew Price\RecoveryOrchestrator.py'
+                
+                process = subprocess.Popen(
+                    [sys.executable, script_path, firmware_dir],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                )
+                
+                for line in process.stdout:
+                    self.log_message(line.strip())
+                    
+                process.wait()
+                
+                if process.returncode == 0:
+                    self.log_message("✓ Orchestrator finished successfully!")
+                    messagebox.showinfo("Success", "Recovery process completed successfully!")
+                else:
+                    self.log_message(f"✗ Orchestrator failed with exit code {process.returncode}")
+                    messagebox.showerror("Error", "Recovery process failed. Check logs.")
+                    
+            except Exception as e:
+                self.log_message(f"✗ Error running orchestrator: {str(e)}")
+                
+        threading.Thread(target=worker, daemon=True).start()
 
     def on_unlock_bl(self):
         if not messagebox.askyesno('Unlock Bootloader',
