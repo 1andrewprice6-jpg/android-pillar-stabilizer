@@ -55,7 +55,24 @@ def build_qfil_cmd(loader: Path, rawprogram: Path, patch: Path, imagedir: Path) 
     ]
 
 
-def flash_lun(lun: int, loader: Path, payload_dir: Path, imagedir: Path, dryrun: bool) -> bool:
+def make_edl_env() -> dict:
+    """Build subprocess env with pip libusb 1.0.27 DLL prepended to PATH."""
+    env = os.environ.copy()
+    pip_libusb = r"C:\Users\Andrew Price\AppData\Roaming\Python\Python39\site-packages\libusb\_platform\_windows\x64"
+    env["PATH"] = pip_libusb + ";" + env.get("PATH", "")
+    return env
+
+
+def ensure_edl_logs_dir() -> None:
+    """Create edl-master logs/ directory if missing (edlclient crashes without it)."""
+    logs_dir = config.EDL_REPO_PATH / "logs"
+    if not logs_dir.exists():
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created missing logs dir: {logs_dir}")
+
+
+def flash_lun(lun: int, loader: Path, payload_dir: Path, imagedir: Path,
+              dryrun: bool, env: Optional[dict] = None) -> bool:
     """Flash one UFS LUN via edl.py qfil subprocess."""
     rawprogram = payload_dir / f"rawprogram{lun}.xml"
     patch = payload_dir / f"patch{lun}.xml"
@@ -75,10 +92,8 @@ def flash_lun(lun: int, loader: Path, payload_dir: Path, imagedir: Path, dryrun:
         logger.info(f"  [DRYRUN] skipping execution")
         return True
 
-    env = os.environ.copy()
-    # Prepend pip libusb 1.0.27 DLL path so edlclient finds the correct WinUSB-compatible DLL
-    pip_libusb = r"C:\Users\Andrew Price\AppData\Roaming\Python\Python39\site-packages\libusb\_platform\_windows\x64"
-    env["PATH"] = pip_libusb + ";" + env.get("PATH", "")
+    if env is None:
+        env = make_edl_env()
     result = subprocess.run(cmd, cwd=str(config.EDL_REPO_PATH), timeout=600, env=env)
     if result.returncode == 0:
         logger.info(f"LUN {lun}: PASS")
@@ -141,12 +156,14 @@ def run_vip_flash(use_vip: bool, luns: List[int], dryrun: bool) -> bool:
     # Flash each LUN — reset device after each flash so next LUN starts from clean sahara state
     logger.info("=== Flashing ===")
     import time
+    ensure_edl_logs_dir()
+    edl_env = make_edl_env()
     results = {}
     for i, lun in enumerate(luns):
         if i > 0:
             logger.info(f"Waiting 15s for device to come back in EDL mode before LUN {lun}...")
             time.sleep(15)
-        results[lun] = flash_lun(lun, loader, payload_dir, imagedir, dryrun)
+        results[lun] = flash_lun(lun, loader, payload_dir, imagedir, dryrun, env=edl_env)
         # After each flash (except last), send explicit reset to cleanly exit firehose
         if i < len(luns) - 1 and not dryrun:
             logger.info(f"Sending reset after LUN {lun} to cleanly exit firehose...")
@@ -157,7 +174,7 @@ def run_vip_flash(use_vip: bool, luns: List[int], dryrun: bool) -> bool:
             ]
             try:
                 subprocess.run(reset_cmd, cwd=str(config.EDL_REPO_PATH),
-                               timeout=20, env=env, capture_output=True)
+                               timeout=20, env=edl_env, capture_output=True)
             except Exception:
                 pass  # reset may not respond — that's fine
 
