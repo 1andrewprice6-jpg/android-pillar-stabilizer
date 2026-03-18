@@ -13,6 +13,7 @@ Flags:
     --lun       Flash specific LUN (0-5) or 'all' (default: all)
     --dryrun    Validate paths and print commands only, do not flash
 """
+import os
 import sys
 import logging
 import argparse
@@ -50,7 +51,6 @@ def build_qfil_cmd(loader: Path, rawprogram: Path, patch: Path, imagedir: Path) 
         sys.executable, str(EDL_PY),
         "--loader", str(loader),
         "--memory", "ufs",
-        "--sectorsize", "4096",
         "qfil", str(rawprogram), str(patch), str(imagedir),
     ]
 
@@ -75,7 +75,11 @@ def flash_lun(lun: int, loader: Path, payload_dir: Path, imagedir: Path, dryrun:
         logger.info(f"  [DRYRUN] skipping execution")
         return True
 
-    result = subprocess.run(cmd, cwd=str(config.EDL_REPO_PATH), timeout=600)
+    env = os.environ.copy()
+    # Prepend pip libusb 1.0.27 DLL path so edlclient finds the correct WinUSB-compatible DLL
+    pip_libusb = r"C:\Users\Andrew Price\AppData\Roaming\Python\Python39\site-packages\libusb\_platform\_windows\x64"
+    env["PATH"] = pip_libusb + ";" + env.get("PATH", "")
+    result = subprocess.run(cmd, cwd=str(config.EDL_REPO_PATH), timeout=600, env=env)
     if result.returncode == 0:
         logger.info(f"LUN {lun}: PASS")
         return True
@@ -120,18 +124,42 @@ def run_vip_flash(use_vip: bool, luns: List[int], dryrun: bool) -> bool:
         logger.info("Dry run complete.")
         return True
 
-    # Check USB device
+    # Check USB device — wait up to 60s for device to appear
     logger.info("=== USB device check ===")
-    if not find_edl_usb():
-        logger.error("EDL device not detected. Hold Vol+ + Vol- while plugging USB.")
+    import time
+    for attempt in range(30):
+        if find_edl_usb():
+            break
+        if attempt == 0:
+            logger.info("Waiting for EDL device... (Hold Vol+ + Vol- while plugging USB)")
+        time.sleep(2)
+    else:
+        logger.error("EDL device not detected after 60s. Aborting.")
         return False
     logger.info("EDL device found (VID:05C6 PID:9008)")
 
-    # Flash each LUN
+    # Flash each LUN — reset device after each flash so next LUN starts from clean sahara state
     logger.info("=== Flashing ===")
+    import time
     results = {}
-    for lun in luns:
+    for i, lun in enumerate(luns):
+        if i > 0:
+            logger.info(f"Waiting 15s for device to come back in EDL mode before LUN {lun}...")
+            time.sleep(15)
         results[lun] = flash_lun(lun, loader, payload_dir, imagedir, dryrun)
+        # After each flash (except last), send explicit reset to cleanly exit firehose
+        if i < len(luns) - 1 and not dryrun:
+            logger.info(f"Sending reset after LUN {lun} to cleanly exit firehose...")
+            reset_cmd = [
+                sys.executable, str(EDL_PY),
+                "--loader", str(loader),
+                "--skipresponse", "reset",
+            ]
+            try:
+                subprocess.run(reset_cmd, cwd=str(config.EDL_REPO_PATH),
+                               timeout=20, env=env, capture_output=True)
+            except Exception:
+                pass  # reset may not respond — that's fine
 
     # Summary
     logger.info("=== Summary ===")

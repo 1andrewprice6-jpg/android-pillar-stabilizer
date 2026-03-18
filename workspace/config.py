@@ -32,10 +32,10 @@ PORT = "COM5"
 # SM8550 (Snapdragon 8 Gen 2) requires a valid signed loader; use stock unless it fails auth.
 # If stock loader returns VIP/auth error, switch to VIP_LOADER_PATH.
 LOADER_PATH = FIRMWARE_ROOT / "prog_firehose_ddr.elf"
-VIP_LOADER_PATH = EDL_BKERLER_PATH / "Loaders" / "oppo" / "prog_firehose_ddr.elf"
+VIP_LOADER_PATH = Path(r"C:\Users\Andrew Price\Desktop\edl\Loaders\oppo\prog_firehose_ddr.elf")
 
 # Set USE_VIP_LOADER = True to force the VIP-bypass loader (bkerler oppo)
-USE_VIP_LOADER = False
+USE_VIP_LOADER = False  # Stock loader works; VIP bypass handled by edlclient at firehose level
 ACTIVE_LOADER = VIP_LOADER_PATH if USE_VIP_LOADER else LOADER_PATH
 
 # CPH2451 UFS LUN map (SM8550 / Snapdragon 8 Gen 2)
