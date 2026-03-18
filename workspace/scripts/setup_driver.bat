@@ -50,13 +50,13 @@ if defined ZADIG_PATH (
 )
 
 echo.
-echo After installing the WinUSB driver in Zadig, press any key to verify...
+echo After installing the WinUSB driver in Zadig, press any key to run the full driver status check...
 pause >nul
 
-:: Verify the device is now accessible
+:: Run driver status checker
 echo.
-echo Checking if EDL device is accessible via libusb...
-python -c "import usb.core; d=usb.core.find(idVendor=0x05C6,idProduct=0x9008); print('[OK] Device accessible!' if d else '[FAIL] Device not found - ensure phone is in EDL mode')"
-echo.
+echo Running driver status checker...
+powershell -ExecutionPolicy Bypass -File "%~dp0check_driver_status.ps1"
+
 pause
 endlocal
