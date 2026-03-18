@@ -6,10 +6,10 @@ WORKSPACE_DIR = Path(__file__).parent
 PROJECT_ROOT = WORKSPACE_DIR.parent
 
 # External paths (update these if the environment changes)
-EDL_REPO_PATH = Path(r"C:\Users\Andrew Price\Lazarus_11\edl_repo")
+EDL_REPO_PATH = Path(r"C:\Users\Andrew Price\Desktop\edl-master\edl-master")
 
 # bkerler edl repo on Desktop (has VIP-bypass loaders in Loaders/oppo/)
-EDL_BKERLER_PATH = Path(r"C:\Users\Andrew Price\Desktop\edl")
+EDL_BKERLER_PATH = Path(r"C:\Users\Andrew Price\Desktop\edl-master\edl-master")
 
 # bkerler/Loaders repo - device-specific Firehose loaders keyed by HWID+pkhash
 # Clone with: workspace\scripts\setup_loaders.bat
@@ -75,6 +75,8 @@ def get_active_loader():
             return LOADER_PATH
         raise FileNotFoundError(f"Loader not found: {loader}")
     return loader
+
+EDL_PY = EDL_REPO_PATH / "edl.py"
 
 def setup_env():
     import sys
