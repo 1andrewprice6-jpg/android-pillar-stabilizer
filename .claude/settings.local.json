@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -l \"import config\\\\|from config\" \"C:/Users/Andrew Price/OP11-VIP-BYPASS-RECOVERY/workspace/scripts/\"*.py)",
+      "Bash(gh auth:*)",
+      "Bash(find 'C:/Users/Andrew Price' -maxdepth 5 -iname *rawprogram*)",
+      "Bash(find 'C:/Users/Andrew Price' -maxdepth 5 -iname *firehose* -o -iname *prog_firehose*)",
+      "Bash(python workspace/scripts/vip_flash.py --dryrun)",
+      "Bash(python workspace/scripts/vip_flash.py --lun all)",
+      "Read(//c/Users/Andrew Price/Desktop/edl-master/edl-master/**)",
+      "Bash(python edl.py --loader \"C:/Users/Andrew Price/OP11-AUTO-RECOVER/flash_ready/prog_firehose_ddr.elf\" --memory ufs --debugmode printgpt --lun 0)",
+      "Bash(pip install:*)",
+      "Bash(python workspace/scripts/vip_flash.py --lun 1)"
+    ]
+  }
+}
