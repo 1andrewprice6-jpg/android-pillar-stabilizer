@@ -31,7 +31,10 @@
       "Bash(python -c \":*)",
       "Bash(python edl.py --loader \"C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\flash_ready\\\\prog_firehose_ddr.elf\" --memory ufs --skipresponse qfil \"C:\\\\Users\\\\Andrew Price\\\\OP11-VIP-BYPASS-RECOVERY\\\\.claude\\\\worktrees\\\\loving-hellman\\\\workspace\\\\payloads\\\\rawprogram1.xml\" \"C:\\\\Users\\\\Andrew Price\\\\OP11-VIP-BYPASS-RECOVERY\\\\.claude\\\\worktrees\\\\loving-hellman\\\\workspace\\\\payloads\\\\patch1.xml\" \"C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\flash_ready\")",
       "Bash(python3:*)",
-      "Bash(__NEW_LINE_ac3ab933633ed0de__ python3:*)"
+      "Bash(__NEW_LINE_ac3ab933633ed0de__ python3:*)",
+      "Bash(tee \"C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\lun1_full.txt\")",
+      "Bash(timeout 300 tail -f 'C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\lun1_full.txt')",
+      "Bash(taskkill /F /IM python.exe)"
     ]
   }
 }
