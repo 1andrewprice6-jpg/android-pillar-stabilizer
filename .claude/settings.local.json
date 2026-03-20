@@ -26,7 +26,12 @@
       "Bash(python workspace/scripts/vip_flash.py --vip --dryrun)",
       "Bash(python workspace/scripts/vip_flash.py --vip --lun 4)",
       "Bash(cmd.exe /c \"where QFIL.exe 2>nul & dir /b \"\"C:\\\\Program Files \\(x86\\)\\\\Qualcomm\\\\QFIL\"\" 2>nul & dir /b \"\"C:\\\\Program Files\\\\Qualcomm\\\\QFIL\"\" 2>nul\")",
-      "Bash(xxd '/c/Users/Andrew Price/OP11-AUTO-RECOVER/flash_ready/DigestsToSign_nv00000000.bin.mbn')"
+      "Bash(xxd '/c/Users/Andrew Price/OP11-AUTO-RECOVER/flash_ready/DigestsToSign_nv00000000.bin.mbn')",
+      "Bash(python workspace/scripts/check_firmware_files.py)",
+      "Bash(python -c \":*)",
+      "Bash(python edl.py --loader \"C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\flash_ready\\\\prog_firehose_ddr.elf\" --memory ufs --skipresponse qfil \"C:\\\\Users\\\\Andrew Price\\\\OP11-VIP-BYPASS-RECOVERY\\\\.claude\\\\worktrees\\\\loving-hellman\\\\workspace\\\\payloads\\\\rawprogram1.xml\" \"C:\\\\Users\\\\Andrew Price\\\\OP11-VIP-BYPASS-RECOVERY\\\\.claude\\\\worktrees\\\\loving-hellman\\\\workspace\\\\payloads\\\\patch1.xml\" \"C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\flash_ready\")",
+      "Bash(python3:*)",
+      "Bash(__NEW_LINE_ac3ab933633ed0de__ python3:*)"
     ]
   }
 }
