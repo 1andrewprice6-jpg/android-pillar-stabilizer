@@ -1,0 +1,53 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "VIP Flash (all LUNs)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["workspace/scripts/vip_flash.py", "--lun", "all"],
+      "port": 0
+    },
+    {
+      "name": "VIP Flash (dry run)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["workspace/scripts/vip_flash.py", "--dryrun"],
+      "port": 0
+    },
+    {
+      "name": "Master Recovery Runner",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "workspace\\scripts\\run_all.bat"],
+      "port": 0
+    },
+    {
+      "name": "Check Firmware Files",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["workspace/scripts/check_firmware_files.py"],
+      "port": 0
+    },
+    {
+      "name": "Verify Environment",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["workspace/scripts/verify_env.py"],
+      "port": 0
+    },
+    {
+      "name": "Auto Monitor EDL",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "workspace\\scripts\\auto_monitor_edl.bat"],
+      "port": 0
+    },
+    {
+      "name": "Setup WinUSB Driver",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "workspace\\scripts\\setup_driver.bat"],
+      "port": 0
+    },
+    {
+      "name": "Check Driver Status",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-ExecutionPolicy", "Bypass", "-File", "workspace\\scripts\\check_driver_status.ps1"],
+      "port": 0
+    }
+  ]
+}

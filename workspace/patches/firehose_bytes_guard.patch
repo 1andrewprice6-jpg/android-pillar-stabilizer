@@ -1,0 +1,22 @@
+--- a/edlclient/Library/firehose.py
++++ b/edlclient/Library/firehose.py
+@@ cmd_read_buffer (line ~736)
+-        if "value" in rsp.data and rsp.data["value"] == "NAK":
++        if isinstance(rsp.data, dict) and "value" in rsp.data and rsp.data["value"] == "NAK":
+
+@@ configure (line ~957)
+-                elif "MaxPayloadSizeToTargetInBytes" in rsp.data:
++                elif isinstance(rsp.data, dict) and "MaxPayloadSizeToTargetInBytes" in rsp.data:
+
+# Root cause:
+# When flashing multiple LUNs sequentially, the device may leave stale data in the USB
+# endpoint buffer from the previous firehose session. When the next LUN's edl.py subprocess
+# connects, xmlsend() receives those stale bytes and returns rsp.data=bytes instead of a dict.
+# The unguarded 'in rsp.data' dict membership test then raises:
+#   TypeError: a bytes-like object is required, not 'str'
+# The isinstance(rsp.data, dict) guard short-circuits the check safely when rsp.data is bytes,
+# allowing the error path to handle the stale-buffer case without crashing.
+#
+# Apply with:
+#   cd C:\Users\Andrew Price\Desktop\edl-master\edl-master
+#   patch -p1 < workspace\patches\firehose_bytes_guard.patch
