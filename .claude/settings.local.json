@@ -34,7 +34,10 @@
       "Bash(__NEW_LINE_ac3ab933633ed0de__ python3:*)",
       "Bash(tee \"C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\lun1_full.txt\")",
       "Bash(timeout 300 tail -f 'C:\\\\Users\\\\Andrew Price\\\\OP11-AUTO-RECOVER\\\\lun1_full.txt')",
-      "Bash(taskkill /F /IM python.exe)"
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(for lun:*)",
+      "Bash(do echo:*)",
+      "Bash(ls -lh C:UsersAndrew PriceOP11-AUTO-RECOVERlun*_flash.log)"
     ]
   }
 }
