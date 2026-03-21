@@ -86,30 +86,30 @@ class ShellExecutor {
         var temp = readBatteryValue("/sys/class/power_supply/battery/temp")
 
         // Fallback to alternative paths if primary fails
-        if (current == 0L) {
+        if (current == null || current == 0L) {
             current = readBatteryValue("/sys/class/power_supply/bms/current_now")
         }
-        if (voltage == 0L) {
+        if (voltage == null || voltage == 0L) {
             voltage = readBatteryValue("/sys/class/power_supply/bms/voltage_now")
         }
-        if (temp == 0) {
-            temp = readBatteryValue("/sys/class/power_supply/bms/temp")?.toInt() ?: 0
+        if (temp == null || temp == 0L) {
+            temp = readBatteryValue("/sys/class/power_supply/bms/temp")
         }
 
         return BatteryInfo(
-            currentMicroamps = current,
-            voltageMicrovolts = voltage,
-            temperatureDeciCelsius = temp as? Int ?: 0
+            currentMicroamps = current ?: 0L,
+            voltageMicrovolts = voltage ?: 0L,
+            temperatureDeciCelsius = temp?.toInt() ?: 0
         )
     }
 
     /**
      * Helper to safely read battery values with error handling.
      */
-    private suspend fun readBatteryValue(path: String): Number? {
+    private suspend fun readBatteryValue(path: String): Long? {
         val result = execute("cat $path 2>/dev/null")
         return if (result.isSuccess && result.output.isNotBlank()) {
-            result.output.trim().toLongOrNull() ?: result.output.trim().toIntOrNull()
+            result.output.trim().toLongOrNull()
         } else {
             null
         }
