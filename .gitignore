@@ -79,3 +79,6 @@ NEONPROTOCOL/[Uu]ser[Ss]ettings/
 **/[Ll]ogs/
 **/[Uu]ser[Ss]ettings/
 
+
+# Claude local settings (machine-specific, not for version control)
+.claude/settings.local.json

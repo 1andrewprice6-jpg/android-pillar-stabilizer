@@ -13,7 +13,7 @@ OnePlus 11 devices have VIP enabled on the bootloader. When attempting to flash 
 Modified `edlclient/Library/firehose.py` lines 990-996 to catch VIP-related authentication errors and convert them from fatal `sys.exit()` to non-fatal warnings, allowing the flash process to continue.
 
 ### Code Change
-**File**: `C:\Users\Andrew Price\Desktop\edl-master\edl-master\edlclient\Library\firehose.py`
+**File**: `edlclient/Library/firehose.py`
 **Lines**: 990-996
 
 ```python
@@ -26,10 +26,10 @@ else:
 
 ### Key Points
 - Pattern matching catches:
-  - `"VIP img authentication failed"`
-  - `"Verifying signature failed"`
-  - `"Authentication of signed hash failed"`
-  - Uses `"uthentication"` to match both "Authentication" and "Verifying signature" variations
+  - `"VIP img authentication failed"` (matched by `"VIP"` and `"uthentication"`)
+  - `"Verifying signature failed"` (matched by `"Verifying signature"`)
+  - `"Authentication of signed hash failed"` (matched by `"uthentication"`)
+  - Uses `"VIP"`, `"Verifying signature"`, and `"uthentication"` substrings to cover the different VIP-related error message variants
 
 - Non-VIP errors still trigger `sys.exit()` (prevents masking real failures)
 - Errors are logged as warnings with `[VIP-BYPASS]` tag for debugging
@@ -71,8 +71,8 @@ python edl.py \
 ## Device Specifications
 - **Model**: OnePlus 11 (CPH2451)
 - **SoC**: Qualcomm Snapdragon 8 Gen 2 (SM8550)
-- **Serial**: 4372b5bcb51
-- **HWID**: 001ca0e100510000
+- **Serial**: <DEVICE_SERIAL>
+- **HWID**: <DEVICE_HWID>
 - **Sahara Version**: 3
 - **Firehose Version**: SM8550_V2.6 (May 20 2024)
 
@@ -80,7 +80,7 @@ python edl.py \
 - `edlclient/Library/firehose.py` (VIP bypass patch)
 
 ## Automated Execution
-Script: `C:\Users\Andrew Price\OP11-AUTO-RECOVER\FLASH_ALL_LUNS.py`
+Example automation script (external, not included in this repo): `FLASH_ALL_LUNS.py`
 - Handles sequential LUN flashing with auto-detection of device re-enumeration
 - Per-LUN logging to timestamped files
 - Error handling and recovery attempts

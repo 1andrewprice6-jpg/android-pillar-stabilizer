@@ -12,7 +12,7 @@ Successfully implemented and verified a complete VIP (Vendor Image Protection) a
 ## Implementation Details
 
 ### Core Changes
-**File**: `C:\Users\Andrew Price\Desktop\edl-master\edl-master\edlclient\Library\firehose.py`
+**File**: `edlclient/Library/firehose.py`
 
 **Lines 990-998 - VIP Bypass Implementation**:
 ```python
@@ -43,8 +43,8 @@ return self.configure(lvl + 1)  # After loop completes
 
 ### Live Device Testing Results
 - Device Model: OnePlus 11 (CPH2451)
-- Serial Number: 4372b5bcb51
-- Hardware ID: 001ca0e100510000
+- Serial Number: [redacted]
+- Hardware ID: [redacted]
 - Firehose Version: SM8550_V2.6 (May 20 2024)
 
 ### Test Sequence
