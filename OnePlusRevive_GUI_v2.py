@@ -5,6 +5,7 @@ Firmware: 15.0.0.600 NA EX01
 """
 
 import sys
+import shutil
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import subprocess
@@ -13,7 +14,30 @@ import logging
 from pathlib import Path
 import time
 import hashlib
-import serial.tools.list_ports
+
+try:
+    import serial.tools.list_ports
+    _HAS_SERIAL = True
+except ImportError:
+    _HAS_SERIAL = False
+
+
+def _find_edl_tool():
+    """Return path to bkerler/edl tool (installed command or edl.py script)."""
+    cmd = shutil.which("edl")
+    if cmd:
+        return cmd
+    candidates = [
+        Path.home() / "edl" / "edl.py",
+        Path.home() / "Desktop" / "edl-master" / "edl-master" / "edl.py",
+        Path.home() / "Desktop" / "edl" / "edl.py",
+        Path(__file__).parent / "edl.py",
+        Path(__file__).parent / "edl" / "edl.py",
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return None
 
 class OnePlusGUI:
     def __init__(self, root):
@@ -163,14 +187,15 @@ class OnePlusGUI:
         self.log("Ready for auto-detection of firehose and loader files")
 
     def _find_edl_port(self):
-        """Auto-detect Qualcomm EDL device (VID=05C6, PID=9008), fallback COM5."""
-        for port in serial.tools.list_ports.comports():
-            if port.vid == 0x05C6 and port.pid == 0x9008:
-                return port.device.replace("\\\\.\\", "")
-        return "COM5"
+        """Auto-detect Qualcomm EDL device (VID=05C6, PID=9008)."""
+        if _HAS_SERIAL:
+            for port in serial.tools.list_ports.comports():
+                if port.vid == 0x05C6 and port.pid == 0x9008:
+                    return port.device.replace("\\\\.\\", "")
+        return None
 
     def find_firehose(self, loader_dir):
-        """Find and validate firehose file"""
+        """Find and validate firehose programmer file (prog_firehose_ddr.elf or similar)."""
         self.log("Searching for firehose programmer...", "info")
 
         try:
@@ -179,13 +204,26 @@ class OnePlusGUI:
                 self.log("Loader directory not found!", "error")
                 return False
 
-            # Search for fhprg.bin (firehose)
-            firehose_files = list(loader_path.glob("**/fhprg.bin")) + \
-                            list(loader_path.glob("**/fhprg*.bin")) + \
-                            list(loader_path.glob("*fhprg*"))
+            # SM8550 / CPH2451 uses prog_firehose_ddr.elf.
+            # Also accept any other .elf or fhprg*.bin as fallback.
+            firehose_files = (
+                list(loader_path.glob("**/prog_firehose_ddr.elf")) +
+                list(loader_path.glob("**/prog_firehose_ddr_ufs.elf")) +
+                list(loader_path.glob("**/prog_emmc_firehose.elf")) +
+                list(loader_path.glob("**/*.elf")) +
+                list(loader_path.glob("**/fhprg*.bin"))
+            )
+            # De-duplicate and prefer ddr.elf
+            seen = set()
+            unique = []
+            for f in firehose_files:
+                if str(f) not in seen:
+                    seen.add(str(f))
+                    unique.append(f)
+            firehose_files = unique
 
             if not firehose_files:
-                self.log("Firehose file not found (fhprg.bin)", "error")
+                self.log("Firehose programmer not found (expected prog_firehose_ddr.elf)", "error")
                 self.firehose_file.set("NOT FOUND")
                 return False
 
@@ -254,22 +292,51 @@ class OnePlusGUI:
         self.log("Detecting device in EDL mode...", "info")
 
         def detect():
+            # Fast path: check USB serial ports for QDLoader 9008 (VID=05C6, PID=9008)
+            com_port = self._find_edl_port()
+            if com_port:
+                self.device_status.set("✓ DETECTED")
+                self.log(f"EDL device found on {com_port} (QDLoader 9008)", "success")
+                return
+
+            # Also try pyusb direct detection
             try:
-                edl_script = r"C:\Users\Andrew Price\edl\edl.py"
-                com_port = self._find_edl_port()
-                result = subprocess.run([sys.executable, edl_script, "--serial", f"--portname=\\\\.\\{com_port}"], capture_output=True, text=True, timeout=5)
-                if "Mode detected" in result.stdout.lower() or "sahara" in result.stdout.lower() or result.returncode == 0:
+                import usb.core
+                dev = usb.core.find(idVendor=0x05C6, idProduct=0x9008)
+                if dev is not None:
+                    self.device_status.set("✓ DETECTED (USB)")
+                    self.log("EDL device found via USB (QDLoader 9008)", "success")
+                    return
+            except ImportError:
+                pass
+
+            # Fallback: try edl tool --help to confirm installation, then printgpt
+            edl_tool = _find_edl_tool()
+            if not edl_tool:
+                self.device_status.set("✗ EDL NOT INSTALLED")
+                self.log("edl tool not found — install with: pip install edl", "error")
+                return
+
+            try:
+                run_cmd = ([sys.executable, edl_tool] if edl_tool.endswith(".py")
+                           else [edl_tool])
+                result = subprocess.run(
+                    run_cmd + ["printgpt", "--memory=ufs"],
+                    capture_output=True, text=True, timeout=8
+                )
+                if result.returncode == 0:
                     self.device_status.set("✓ DETECTED")
-                    self.log(f"Device found on {com_port}!", "success")
+                    self.log("Device detected in EDL mode via edl tool", "success")
                 else:
                     self.device_status.set("✗ NOT DETECTED")
-                    self.log(f"Device not found on {com_port}. Check connection.", "warning")
-            except FileNotFoundError:
-                self.device_status.set("✗ EDL NOT INSTALLED")
-                self.log("edl tool not found. Install with: pip install edl", "error")
+                    self.log("Device not found. Check USB connection and EDL mode.", "warning")
+                    self.log("  adb reboot edl  OR  fastboot oem edl", "info")
             except subprocess.TimeoutExpired:
                 self.device_status.set("✗ TIMEOUT")
-                self.log("Device detection timed out.", "error")
+                self.log("Device detection timed out.", "warning")
+            except Exception as exc:
+                self.device_status.set("✗ ERROR")
+                self.log(f"Detection error: {exc}", "error")
 
         thread = threading.Thread(target=detect, daemon=True)
         thread.start()
@@ -332,57 +399,111 @@ class OnePlusGUI:
                 self.log(f"Prog files: {len(self.prog_files)}", "info")
                 self.log(f"Patch files: {len(self.patch_files)}", "info")
                 self.log("", "info")
-                self.log("[FLASHING] Starting REAL firmware flash...", "info")
-                self.log("[PROGRESS] This will take 5-15 minutes", "warning")
-                self.log("[CRITICAL] DO NOT DISCONNECT DEVICE", "warning")
+                self.log("[FLASHING] Starting REAL firmware flash via EDL...", "info")
+                self.log("[PROGRESS] This will take 5-15 minutes per device", "warning")
+                self.log("[CRITICAL] DO NOT DISCONNECT DEVICE DURING FLASH", "warning")
 
-                # Construct the real EDL command
-                edl_script = r"C:\Users\Andrew Price\edl\edl.py"
-                com_port = self._find_edl_port()
+                edl_tool = _find_edl_tool()
+                if not edl_tool:
+                    self.log("edl tool not found — install with: pip install edl", "error")
+                    messagebox.showerror("Error", "edl tool not found. Run: pip install edl")
+                    return
 
-                # Get paths
-                raw_xml = self.prog_files[0] # Usually rawprogram0.xml
-                patch_xml = self.patch_files[0] # Usually patch0.xml
                 firmware_dir = self.firmware_path.get()
                 loader_file = self.firehose_path
+                com_port = self._find_edl_port()
 
-                cmd = [
-                    sys.executable,
-                    edl_script,
-                    "qfil",
-                    str(raw_xml),
-                    str(patch_xml),
-                    str(firmware_dir),
-                    f"--loader={str(loader_file)}",
-                    "--memory=ufs",
-                    "--serial",
-                    f"--portname=\\\\.\\{com_port}",
-                    "--debugmode"
-                ]
-                
-                self.log(f"Running command: {' '.join(cmd)}", "info")
-                
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    universal_newlines=True
-                )
+                # Sort prog and patch files by LUN index for proper ordering
+                def lun_key(p):
+                    import re
+                    m = re.search(r'(\d+)', Path(p).stem)
+                    return int(m.group(1)) if m else 0
 
-                for line in process.stdout:
-                    self.log(line.strip(), "info")
-                    
-                process.wait()
+                sorted_prog = sorted(self.prog_files, key=lun_key)
+                sorted_patch = sorted(self.patch_files, key=lun_key)
 
-                if process.returncode == 0:
+                # Match prog files to patch files by LUN index
+                lun_pairs = []
+                for prog in sorted_prog:
+                    idx = lun_key(prog)
+                    matching_patch = next(
+                        (p for p in sorted_patch if lun_key(p) == idx), None
+                    )
+                    if matching_patch:
+                        lun_pairs.append((idx, prog, matching_patch))
+
+                if not lun_pairs:
+                    # Fall back to pairing by position
+                    lun_pairs = list(enumerate(zip(sorted_prog, sorted_patch)))
+                    lun_pairs = [(i, p[0], p[1]) for i, p in lun_pairs]
+
+                total_luns = len(lun_pairs)
+                success_count = 0
+
+                for lun_idx, raw_xml, patch_xml in lun_pairs:
                     self.log("", "info")
-                    self.log("🎉 FIRMWARE FLASHING COMPLETE", "success")
+                    self.log(f"{'='*50}", "info")
+                    self.log(f"  LUN {lun_idx}: {Path(raw_xml).name}", "info")
+                    self.log(f"{'='*50}", "info")
+
+                    # Wait for re-enumeration between LUNs (except first)
+                    if lun_idx > lun_pairs[0][0]:
+                        self.log("Waiting 8s for device to re-enumerate...", "info")
+                        time.sleep(8)
+                        new_port = self._find_edl_port()
+                        if new_port:
+                            com_port = new_port
+                            self.log(f"Device re-detected on {com_port}", "success")
+
+                    run_cmd = ([sys.executable, edl_tool] if edl_tool.endswith(".py")
+                               else [edl_tool])
+                    cmd = run_cmd + [
+                        "qfil",
+                        str(raw_xml),
+                        str(patch_xml),
+                        str(firmware_dir),
+                        f"--loader={str(loader_file)}",
+                        "--memory=ufs",
+                        "--skipresponse",
+                    ]
+                    if com_port:
+                        port_str = com_port if com_port.startswith("\\\\.\\") else f"\\\\.\\{com_port}"
+                        cmd += ["--serial", f"--portname={port_str}"]
+
+                    self.log(f"CMD: {' '.join(str(c) for c in cmd)}", "info")
+
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1,
+                        universal_newlines=True,
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+
+                    for line in process.stdout:
+                        line = line.rstrip()
+                        if line:
+                            level = "warning" if "[VIP-BYPASS]" in line else "info"
+                            self.log(line, level)
+
+                    process.wait()
+
+                    if process.returncode == 0:
+                        self.log(f"✓ LUN {lun_idx} flashed successfully", "success")
+                        success_count += 1
+                    else:
+                        self.log(f"✗ LUN {lun_idx} failed (code {process.returncode})", "error")
+
+                self.log("", "info")
+                if success_count == total_luns:
+                    self.log(f"FIRMWARE FLASHING COMPLETE ({success_count}/{total_luns} LUNs)", "success")
                     messagebox.showinfo("Success", "Resurrection complete! Device will reboot.")
                 else:
-                    self.log(f"✗ FLASHING FAILED (Code: {process.returncode})", "error")
-                    messagebox.showerror("Error", "Flashing failed. Check logs.")
+                    self.log(f"FLASHING PARTIALLY COMPLETE ({success_count}/{total_luns} LUNs)", "warning")
+                    messagebox.showwarning("Partial", f"{success_count}/{total_luns} LUNs flashed. Check logs.")
 
             except Exception as e:
                 self.log(f"Recovery failed: {str(e)}", "error")

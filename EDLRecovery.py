@@ -25,11 +25,26 @@ try:
 except ImportError:
     serial = None
 
-# Standard tool paths
-EDL_TOOL_PATH = Path("C:/Users/Andrew Price/edl/edl.py")
-PLATFORM_TOOLS = Path("C:/Users/Andrew Price/platform-tools")
-ADB_PATH = PLATFORM_TOOLS / "adb.exe"
-FASTBOOT_PATH = PLATFORM_TOOLS / "fastboot.exe"
+import shutil
+
+# Standard tool paths (resolved dynamically; no hardcoded user directories)
+_adb = shutil.which("adb")
+_fastboot = shutil.which("fastboot")
+_edl = shutil.which("edl")
+
+EDL_TOOL_PATH = (
+    Path(_edl) if _edl else
+    next(
+        (p for p in [
+            Path.home() / "edl" / "edl.py",
+            Path.home() / "Desktop" / "edl-master" / "edl-master" / "edl.py",
+            Path(__file__).parent / "edl.py",
+        ] if p.exists()),
+        Path.home() / "edl" / "edl.py"
+    )
+)
+ADB_PATH = Path(_adb) if _adb else Path("adb")
+FASTBOOT_PATH = Path(_fastboot) if _fastboot else Path("fastboot")
 
 # Configure logging
 logging.basicConfig(
@@ -134,7 +149,17 @@ class SaharaProtocol:
             return False
 
     def inject_loader(self, loader_path: str) -> bool:
-        """Upload ELF bootloader via Sahara protocol"""
+        """
+        Upload ELF Firehose programmer via Sahara protocol.
+
+        Sahara data transfer flow (device-initiated):
+          1. Host sends HELLO_RSP acknowledging the HELLO_REQ received in hello().
+          2. Device sends READ_DATA packets, each specifying an offset+length it
+             needs from the ELF image.
+          3. Host reads those packets and responds with the requested data chunks.
+          4. When all data is sent the device sends END_TRANSFER (0x04).
+          5. Host then sends DONE_REQ (0x07); device replies DONE_RESP (0x08).
+        """
         try:
             logger.info(f"Loading ELF from: {loader_path}")
             loader_file = Path(loader_path)
@@ -143,42 +168,62 @@ class SaharaProtocol:
                 logger.error(f"Loader file not found: {loader_path}")
                 return False
 
-            # Read ELF file
             with open(loader_file, 'rb') as f:
                 elf_data = f.read()
 
-            logger.info(f"ELF file size: {len(elf_data)} bytes")
+            logger.info(f"ELF size: {len(elf_data)} bytes ({len(elf_data) // 1024} KB)")
 
-            # Send READ_DATA request (request from device to upload data)
-            read_req = struct.pack('<IIII',
-                                  self.SAHARA_READ_DATA,  # command
-                                  0x14,                   # length
-                                  0,                      # address
-                                  len(elf_data))          # size
-            self.usb.write(read_req)
-            logger.info("Sent READ_DATA request")
+            # Send HELLO_RSP so the device starts sending READ_DATA requests
+            # Packet: cmd(4) + length(4) + version(4) + version_min(4) + max_cmd_len(4) + mode(4)
+            hello_rsp = struct.pack('<IIIIII',
+                                   self.SAHARA_HELLO_RESP,  # 0x02
+                                   0x30,                    # packet length
+                                   2,                       # version
+                                   1,                       # min version
+                                   0x1000,                  # max cmd packet length
+                                   0)                       # mode = image transfer
+            self.usb.write(hello_rsp)
+            logger.info("Sent HELLO_RSP — waiting for READ_DATA requests from device...")
 
-            # Device will respond with SAHARA_CMD_READY
-            resp = self.usb.read(0x100)
-            cmd, _ = struct.unpack('<II', resp[:8])
+            # Service READ_DATA requests until END_TRANSFER
+            MAX_ITERATIONS = 2000
+            for _ in range(MAX_ITERATIONS):
+                try:
+                    resp = self.usb.read(0x100)
+                except Exception as e:
+                    logger.error(f"USB read error: {e}")
+                    return False
 
-            if cmd != self.SAHARA_CMD_READY:
-                logger.warning(f"Expected CMD_READY ({self.SAHARA_CMD_READY}), got {cmd}")
+                if len(resp) < 8:
+                    continue
 
-            # Upload the ELF file in chunks
-            chunk_size = 0x1000  # 4KB chunks
-            uploaded = 0
+                cmd, pkt_len = struct.unpack('<II', resp[:8])
 
-            while uploaded < len(elf_data):
-                chunk = elf_data[uploaded:uploaded + chunk_size]
-                self.usb.write(chunk)
-                uploaded += len(chunk)
-                progress = (uploaded / len(elf_data)) * 100
-                logger.info(f"  Uploaded: {uploaded}/{len(elf_data)} bytes ({progress:.1f}%)")
-                time.sleep(0.05)
+                if cmd == self.SAHARA_READ_DATA:
+                    # Device requests a chunk: offset(4) + length(4) in bytes 8-16
+                    if len(resp) < 16:
+                        logger.warning("Short READ_DATA packet — ignoring")
+                        continue
+                    offset = struct.unpack('<I', resp[8:12])[0]
+                    length = struct.unpack('<I', resp[12:16])[0]
+                    chunk = elf_data[offset:offset + length]
+                    self.usb.write(chunk)
+                    progress = min(100.0, ((offset + length) / len(elf_data)) * 100)
+                    logger.info(f"  Chunk @ 0x{offset:08x} len={length} ({progress:.1f}%)")
 
-            logger.info("✓ ELF loader injected successfully")
-            return True
+                elif cmd == self.SAHARA_END_TRANSFER:
+                    logger.info("✓ Device accepted ELF loader (END_TRANSFER received)")
+                    return True
+
+                elif cmd == self.SAHARA_RESET_REQ:
+                    logger.error("Device sent RESET_REQ — loader was rejected")
+                    return False
+
+                else:
+                    logger.debug(f"Unexpected Sahara cmd=0x{cmd:02x} during upload — ignoring")
+
+            logger.error("Loader injection timed out (too many iterations)")
+            return False
 
         except Exception as e:
             logger.error(f"Loader injection failed: {e}")
@@ -206,84 +251,114 @@ class SaharaProtocol:
 class FirehoseProtocol:
     """Firehose Protocol Implementation for partition flashing"""
 
-    FIREHOSE_INIT_XML = b'''<?xml version="1.0" encoding="UTF-8" ?>
-<data>
-  <initialize/>
-</data>'''
-
-    class FirehosePacket:
-        """Firehose packet wrapper"""
-        def __init__(self, payload: bytes):
-            self.payload = payload
-
-        def pack(self) -> bytes:
-            """Pack: length(4) + payload"""
-            return struct.pack('>I', len(self.payload)) + self.payload
+    # Firehose uses raw XML lines terminated by '\n', not a length-prefixed framing.
+    # The <configure> command tells the device our memory type and capabilities.
+    FIREHOSE_CONFIGURE_XML = (
+        b'<?xml version="1.0" encoding="UTF-8" ?>'
+        b'<data><configure MemoryName="UFS" Verbose="0" '
+        b'AlwaysValidate="0" MaxDigestTableSizeInBytes="8192" '
+        b'MaxPayloadSizeToTargetInBytes="1048576" '
+        b'ZlpAwareHost="1" SkipStorageInit="0"/></data>\n'
+    )
 
     def __init__(self, usb_dev: UsbDevice):
         self.usb = usb_dev
 
-    def initialize(self) -> bool:
-        """Initialize Firehose protocol"""
-        try:
-            logger.info("Initializing Firehose...")
-            pkt = self.FirehosePacket(self.FIREHOSE_INIT_XML)
-            self.usb.write(pkt.pack())
+    def _send_xml(self, xml: bytes) -> None:
+        """Send a Firehose XML command (raw, newline-terminated)."""
+        if not xml.endswith(b'\n'):
+            xml = xml + b'\n'
+        self.usb.write(xml)
 
-            resp = self.usb.read(0x1000)
-            if b'<response>' in resp:
-                logger.info("✓ Firehose initialized")
+    def _recv_response(self, max_size: int = 0x4000, timeout: Optional[int] = None) -> bytes:
+        """Read a Firehose XML response from device."""
+        try:
+            return self.usb.read(max_size, timeout)
+        except Exception:
+            return b''
+
+    def initialize(self) -> bool:
+        """Send Firehose configure command and wait for ACK."""
+        try:
+            logger.info("Sending Firehose configure (UFS, SM8550)...")
+            self._send_xml(self.FIREHOSE_CONFIGURE_XML)
+
+            resp = self._recv_response()
+            resp_text = resp.decode('utf-8', errors='replace')
+
+            if 'ACK' in resp_text or 'rawmode' in resp_text.lower():
+                logger.info("✓ Firehose configure accepted")
                 return True
+            elif 'NAK' in resp_text:
+                logger.error(f"Firehose configure NAK'd: {resp_text[:200]}")
+                return False
             else:
-                logger.warning("Unexpected Firehose response")
-                return True  # Continue anyway
+                # Some devices skip ACK/NAK for configure — continue optimistically
+                logger.warning(f"Unexpected configure response (continuing): {resp_text[:100]}")
+                return True
         except Exception as e:
             logger.error(f"Firehose initialization failed: {e}")
             return False
 
     def flash_partition(self, partition_name: str, start_sector: int,
                        num_sectors: int, file_data: bytes) -> bool:
-        """Flash partition using Firehose program command"""
+        """
+        Flash a single partition using the Firehose <program> command.
+
+        Protocol:
+          1. Send <program> XML command (raw XML, newline-terminated).
+          2. Device replies with <response value="ACK" rawmode="true"/>.
+          3. Host streams the raw partition image in 1 MB chunks.
+          4. Device replies with <response value="ACK"/> after all data received.
+        """
         try:
-            logger.info(f"Flashing partition: {partition_name}")
-            logger.info(f"  Start sector: {start_sector}, Size: {num_sectors} sectors")
+            logger.info(f"Flashing: {partition_name}")
+            logger.info(f"  start_sector={start_sector}  num_sectors={num_sectors}")
 
-            # Build Firehose program XML
-            xml = f'''<?xml version="1.0" encoding="UTF-8" ?>
-<data>
-  <program SECTOR_SIZE_IN_BYTES="4096"
-           FILE_SECTOR_SIZE_IN_BYTES="4096"
-           num_partition_sectors="{num_sectors}"
-           start_sector="{start_sector}"
-           filename="{partition_name}"/>
-</data>'''
+            # Build <program> XML — must be a single line, newline-terminated
+            xml_cmd = (
+                f'<?xml version="1.0" encoding="UTF-8" ?>'
+                f'<data>'
+                f'<program SECTOR_SIZE_IN_BYTES="4096" '
+                f'FILE_SECTOR_SIZE_IN_BYTES="4096" '
+                f'num_partition_sectors="{num_sectors}" '
+                f'physical_partition_number="0" '
+                f'start_sector="{start_sector}" '
+                f'filename="{partition_name}"/>'
+                f'</data>'
+            ).encode() + b'\n'
 
-            # Send command
-            pkt = self.FirehosePacket(xml.encode())
-            self.usb.write(pkt.pack())
+            self._send_xml(xml_cmd)
 
-            # Upload partition data
-            logger.info(f"Uploading {len(file_data)} bytes...")
-            chunk_size = 0x10000  # 64KB chunks
+            # Wait for rawmode ACK before streaming data
+            resp = self._recv_response(0x1000)
+            if b'NAK' in resp:
+                logger.error(f"Device NAK'd program command for {partition_name}")
+                logger.error(resp.decode('utf-8', errors='replace')[:300])
+                return False
+
+            # Stream partition image in 1 MB chunks
+            chunk_size = 0x100000  # 1 MB
+            total = len(file_data)
             uploaded = 0
-
-            while uploaded < len(file_data):
+            while uploaded < total:
                 chunk = file_data[uploaded:uploaded + chunk_size]
                 self.usb.write(chunk)
                 uploaded += len(chunk)
-                progress = (uploaded / len(file_data)) * 100
-                logger.info(f"  Uploaded: {uploaded}/{len(file_data)} ({progress:.1f}%)")
-                time.sleep(0.05)
+                pct = (uploaded / total) * 100
+                logger.info(f"  {uploaded}/{total} bytes ({pct:.1f}%)")
 
-            # Read response
-            time.sleep(0.5)
-            resp = self.usb.read(0x1000)
-
-            if b'<response' in resp and b'ACK' in resp:
-                logger.info(f"✓ Partition {partition_name} flashed successfully")
+            # Read final ACK
+            time.sleep(0.3)
+            resp = self._recv_response(0x1000)
+            if b'ACK' in resp:
+                logger.info(f"✓ {partition_name} flashed")
                 return True
+            elif b'NAK' in resp:
+                logger.error(f"NAK after data for {partition_name}")
+                return False
             else:
-                logger.warning("Unexpected response from flash operation")
+                logger.warning(f"Ambiguous response for {partition_name} — assuming success")
                 return True
 
         except Exception as e:

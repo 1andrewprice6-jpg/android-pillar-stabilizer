@@ -20,10 +20,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-EDL_SCRIPT = Path.home() / "edl" / "edl.py"
-PLATFORM_TOOLS = Path.home() / "platform-tools"
-ADB_PATH = PLATFORM_TOOLS / "adb.exe"
-FASTBOOT_PATH = PLATFORM_TOOLS / "fastboot.exe"
+import shutil
+
+# Locate edl tool: prefer pip-installed command, fall back to common source locations
+def _locate_edl_script():
+    cmd = shutil.which("edl")
+    if cmd:
+        return Path(cmd)
+    candidates = [
+        Path.home() / "edl" / "edl.py",
+        Path.home() / "Desktop" / "edl-master" / "edl-master" / "edl.py",
+        Path.home() / "Desktop" / "edl" / "edl.py",
+        Path(__file__).parent / "edl.py",
+        Path(__file__).parent / "edl" / "edl.py",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return Path.home() / "edl" / "edl.py"  # placeholder path
+
+
+EDL_SCRIPT = _locate_edl_script()
+PLATFORM_TOOLS = Path(shutil.which("adb") or "adb").parent if shutil.which("adb") else Path.home() / "platform-tools"
+ADB_PATH = shutil.which("adb") or str(PLATFORM_TOOLS / "adb.exe")
+FASTBOOT_PATH = shutil.which("fastboot") or str(PLATFORM_TOOLS / "fastboot.exe")
 
 
 class OnePlusReviveTool:
@@ -49,42 +69,62 @@ class OnePlusReviveTool:
         logger.info(f"Firmware: {self.DEVICE_INFO['firmware']} {self.DEVICE_INFO['region']}")
 
     def check_edl_mode(self):
-        """Check if device is in EDL mode"""
+        """Check if device is in EDL mode via USB VID/PID or edl tool."""
         logger.info("[WITNESS] Checking for device in EDL mode...")
-        try:
-            # Use edl to detect device
-            result = subprocess.run(
-                [sys.executable, str(EDL_SCRIPT), "printgpt", "--memory=ufs"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
 
-            if result.returncode == 0:
-                logger.info("[SUCCESS] Device found in EDL mode")
+        # Primary: quick USB enumeration (pyserial or pyusb — no timeout risk)
+        try:
+            import serial.tools.list_ports
+            for port in serial.tools.list_ports.comports():
+                if port.vid == 0x05C6 and port.pid == 0x9008:
+                    logger.info(f"[SUCCESS] EDL device detected on {port.device}")
+                    self.device_connected = True
+                    return True
+        except ImportError:
+            pass
+
+        try:
+            import usb.core
+            dev = usb.core.find(idVendor=0x05C6, idProduct=0x9008)
+            if dev is not None:
+                logger.info("[SUCCESS] EDL device found via USB")
                 self.device_connected = True
                 return True
-            else:
-                logger.warning("[FAIL] No device detected")
-                logger.info("Put your device in EDL mode:")
-                logger.info("1. Power off the device")
-                logger.info("2. Hold Volume Down + Power for 5 seconds")
-                logger.info("3. Connect USB cable")
-                return False
-        except FileNotFoundError:
-            logger.error(f"[ERROR] EDL tool not found at {EDL_SCRIPT}")
-            return False
-        except subprocess.TimeoutExpired:
-            logger.error("[TIMEOUT] Device detection timed out")
-            return False
+        except ImportError:
+            pass
+
+        # Fallback: try edl tool if available
+        if EDL_SCRIPT.exists():
+            try:
+                run_cmd = ([sys.executable, str(EDL_SCRIPT)] if str(EDL_SCRIPT).endswith(".py")
+                           else [str(EDL_SCRIPT)])
+                result = subprocess.run(
+                    run_cmd + ["printgpt", "--memory=ufs"],
+                    capture_output=True, text=True, timeout=10
+                )
+                if result.returncode == 0:
+                    logger.info("[SUCCESS] Device found in EDL mode (via edl tool)")
+                    self.device_connected = True
+                    return True
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
+
+        logger.warning("[FAIL] No device detected in EDL mode")
+        logger.info("To enter EDL mode on OnePlus 11 (CPH2451):")
+        logger.info("  Software : adb reboot edl")
+        logger.info("  Fastboot : fastboot oem edl")
+        logger.info("  Hardware : Hold Vol Up + Vol Down + Power, then plug USB")
+        return False
 
     def validate_loaders(self):
         """Validate SM8550 loaders for CPH2451"""
         logger.info("[WITNESS] Validating loaders for SM8550 (CPH2451)...")
 
+        # SM8550 / CPH2451 uses prog_firehose_ddr.elf as the Firehose DDR programmer
         required_loaders = [
-            "*fhprg.bin",  # Firehose programmer
-            "*prog.bin",   # Primary bootloader
+            "prog_firehose_ddr.elf",   # Primary: Firehose DDR programmer (SM8550)
+            "*.elf",                   # Any ELF loader
+            "*.mbn",                   # Alternate loader format
             "*rawprogram*.xml",
             "*patch*.xml"
         ]
@@ -148,17 +188,21 @@ class OnePlusReviveTool:
         try:
             logger.info("[FLASHING] Starting firmware flash via EDL...")
             loader_dir = Path(self.loader_path)
-            # Find the firehose loader
+            # SM8550 (CPH2451) uses prog_firehose_ddr.elf
             loader_file = None
-            for name in ["prog_firehose_ddr.elf", "prog_emmc_firehose.elf"]:
+            for name in ["prog_firehose_ddr.elf", "prog_emmc_firehose.elf",
+                         "prog_firehose_ddr_ufs.elf"]:
                 candidate = loader_dir / name
                 if candidate.exists():
                     loader_file = candidate
                     break
             if not loader_file:
-                bins = list(loader_dir.glob("*.elf")) + list(loader_dir.glob("*.mbn"))
-                if bins:
-                    loader_file = bins[0]
+                # Fall back to any .elf or .mbn in the directory
+                for pattern in ("*.elf", "*.mbn"):
+                    matches = list(loader_dir.glob(pattern))
+                    if matches:
+                        loader_file = matches[0]
+                        break
 
             if not loader_file:
                 logger.error("[FAIL] No firehose loader found")

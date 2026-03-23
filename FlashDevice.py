@@ -350,19 +350,48 @@ def parse_partitions(xml_path: str) -> List[PartitionInfo]:
 
 
 def main():
-    logger.info("\n" + "="*70)
-    logger.info("OnePlus 11 EDL Flash Tool - Production Mode")
-    logger.info("="*70)
+    import argparse
 
-    # Updated firmware directory for CPH2451 15.0.0.201 EX01
-    firmware_dir = r"C:\Users\Andrew Price\Desktop\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\CPH2451export_11_15.0.0.201EX01_2024120218280210_zip\op11\IMAGES"
+    parser = argparse.ArgumentParser(
+        description="OnePlus 11 (CPH2451) EDL Flash Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Device:   OnePlus 11 (CPH2451), Snapdragon 8 Gen 2 (SM8550)
+Firmware: 15.0.0.600 EX01 (ColorOS 15)
 
-    logger.info("\nFirmware: CPH2451 - 15.0.0.201 EX01 (2024-12-02)")
-    logger.info(f"Location: {firmware_dir}")
+Examples:
+  python FlashDevice.py --firmware-dir IMAGES/
+  python FlashDevice.py --firmware-dir IMAGES/ --bootloader IMAGES/prog_firehose_ddr.elf
+        """
+    )
+    parser.add_argument(
+        "--firmware-dir", required=True,
+        help="Directory containing rawprogram0.xml, prog_firehose_ddr.elf, and *.img files"
+    )
+    parser.add_argument(
+        "--bootloader",
+        help="Path to prog_firehose_ddr.elf (default: <firmware-dir>/prog_firehose_ddr.elf)"
+    )
+    parser.add_argument(
+        "--xml",
+        help="Path to rawprogram0.xml (default: <firmware-dir>/rawprogram0.xml)"
+    )
+    parser.add_argument(
+        "--yes", action="store_true",
+        help="Skip confirmation prompt (non-interactive mode)"
+    )
+    args = parser.parse_args()
 
-    logger.info("\nVerifying firmware assets...")
-    bootloader = os.path.join(firmware_dir, "prog_firehose_ddr.elf")
-    xml_file = os.path.join(firmware_dir, "rawprogram0.xml")
+    firmware_dir = args.firmware_dir
+    bootloader = args.bootloader or os.path.join(firmware_dir, "prog_firehose_ddr.elf")
+    xml_file = args.xml or os.path.join(firmware_dir, "rawprogram0.xml")
+
+    logger.info("\n" + "=" * 70)
+    logger.info("OnePlus 11 EDL Flash Tool — Production Mode")
+    logger.info("=" * 70)
+    logger.info(f"\nFirmware dir : {firmware_dir}")
+    logger.info(f"Bootloader   : {bootloader}")
+    logger.info(f"Partition map: {xml_file}")
 
     if not os.path.exists(bootloader):
         logger.error(f"✗ Bootloader not found: {bootloader}")
@@ -372,8 +401,7 @@ def main():
         logger.error(f"✗ Partition map not found: {xml_file}")
         return False
 
-    logger.info(f"✓ Bootloader: {bootloader}")
-    logger.info(f"✓ Partition map: {xml_file}")
+    logger.info("✓ Required files found")
 
     try:
         partitions = parse_partitions(xml_file)
@@ -382,22 +410,19 @@ def main():
         logger.error(f"✗ Failed to parse partitions: {e}")
         return False
 
-    logger.info("\n" + "="*70)
-    logger.info("⚠️  SAFETY WARNING")
-    logger.info("="*70)
-    logger.info("This will flash your OnePlus 11 device completely.")
-    logger.info("All data will be erased. Device will reboot when complete.")
-    logger.info("")
-
-    response = input("Type 'FLASH' to proceed, or any other key to cancel: ").strip().upper()
-    if response != "FLASH":
-        logger.info("Flash cancelled.")
-        return False
+    if not args.yes:
+        logger.info("\n" + "=" * 70)
+        logger.info("WARNING: This will erase your device and flash firmware.")
+        logger.info("Device: OnePlus 11 (CPH2451)")
+        logger.info("=" * 70)
+        response = input("\nType 'FLASH' to proceed, or anything else to cancel: ").strip().upper()
+        if response != "FLASH":
+            logger.info("Flash cancelled.")
+            return False
 
     logger.info("Proceeding with flash...\n")
 
     edl = EDLDevice()
-
     if not edl.detect():
         return False
 

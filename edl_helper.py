@@ -4,12 +4,14 @@ EDL Recovery Helper - Standalone utilities for EDL operations
 """
 
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-HOME = Path.home()
-sys.path.insert(0, str(HOME))
+# Ensure the project directory is on the path for sibling imports
+_SCRIPT_DIR = str(Path(__file__).parent)
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
 
-from EDLRecovery import QualcommRecover
 import logging
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
@@ -21,34 +23,58 @@ class EDLHelper:
 
     @staticmethod
     def detect_edl_device():
-        """Detect if EDL device is connected"""
-        recovery = QualcommRecover()
-        result = recovery.find_device()
-        recovery.close()
-        return result
+        """Detect if EDL device is connected (VID=05C6, PID=9008)."""
+        # Try serial port enumeration first (fast, no driver claim needed)
+        try:
+            import serial.tools.list_ports
+            for port in serial.tools.list_ports.comports():
+                if port.vid == 0x05C6 and port.pid == 0x9008:
+                    logger.info(f"EDL device found on {port.device}")
+                    return True
+        except ImportError:
+            pass
+
+        # Try pyusb direct USB enumeration
+        try:
+            import usb.core
+            dev = usb.core.find(idVendor=0x05C6, idProduct=0x9008)
+            if dev is not None:
+                logger.info("EDL device found via USB")
+                return True
+        except ImportError:
+            pass
+
+        # Fallback: use EDLRecovery module
+        try:
+            from EDLRecovery import QualcommRecover
+            recovery = QualcommRecover()
+            result = recovery.find_device()
+            recovery.close()
+            return result
+        except ImportError:
+            pass
+
+        return False
 
     @staticmethod
     def validate_firmware_structure(firmware_dir):
-        """Validate firmware directory structure"""
+        """Validate firmware directory structure for CPH2451 unbrick."""
         firmware_path = Path(firmware_dir)
-
-        required_files = {
-            'rawprogram0.xml': 'Partition table definition',
-        }
 
         missing = []
 
-        # Check for either emmc or ufs firehose loader
-        if (firmware_path / 'prog_emmc_firehose.elf').exists():
-            required_files['prog_emmc_firehose.elf'] = 'Bootloader/Firehose loader'
-        elif (firmware_path / 'prog_firehose_ddr.elf').exists():
-            required_files['prog_firehose_ddr.elf'] = 'Bootloader/Firehose loader'
-        else:
-            missing.append("prog_firehose_ddr.elf OR prog_emmc_firehose.elf (Bootloader)")
+        # Check for rawprogram0.xml (always required)
+        if not (firmware_path / 'rawprogram0.xml').exists():
+            missing.append("rawprogram0.xml (Partition table definition)")
 
-        for file, desc in required_files.items():
-            if not (firmware_path / file).exists():
-                missing.append(f"{file} ({desc})")
+        # Check for Firehose loader — SM8550 uses prog_firehose_ddr.elf
+        loader_candidates = [
+            'prog_firehose_ddr.elf',
+            'prog_firehose_ddr_ufs.elf',
+            'prog_emmc_firehose.elf',
+        ]
+        if not any((firmware_path / f).exists() for f in loader_candidates):
+            missing.append("prog_firehose_ddr.elf (Firehose DDR programmer)")
 
         if missing:
             logger.error("Missing required files:")
@@ -61,23 +87,36 @@ class EDLHelper:
 
     @staticmethod
     def list_partitions(xml_path):
-        """List partitions from rawprogram0.xml"""
-        from EDLRecovery import FirehoseProtocol, UsbDevice
+        """Parse rawprogram0.xml and return a list of partition dicts."""
+        xml_path = Path(xml_path)
+        if not xml_path.exists():
+            logger.error(f"XML file not found: {xml_path}")
+            return []
 
-        recovery = QualcommRecover()
-        recovery.usb_dev = type('obj', (object,), {'write': None, 'read': None})()
+        try:
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+        except ET.ParseError as e:
+            logger.error(f"XML parse error: {e}")
+            return []
 
-        firehose = FirehoseProtocol(recovery.usb_dev)
-        partitions = firehose.parse_rawprogram_xml(xml_path)
+        partitions = []
+        for program in root.findall('.//program'):
+            label = program.get('label', 'unknown')
+            filename = program.get('filename', '')
+            start_sector = int(program.get('start_sector', 0))
+            num_sectors = int(program.get('num_partition_sectors', 0))
+            partitions.append({
+                'label': label,
+                'filename': filename,
+                'start_sector': start_sector,
+                'num_sectors': num_sectors,
+            })
+            size_mb = (num_sectors * 4096) / (1024 * 1024)
+            logger.info(f"  {label:25} {filename:35} ({size_mb:.1f} MB)")
 
-        if partitions:
-            logger.info("Partitions found:")
-            for p in partitions:
-                size_mb = (p['num_sectors'] * 4096) / (1024 * 1024)
-                logger.info(f"  {p['label']:20} - {p['filename']:30} ({size_mb:.1f}MB)")
-        else:
-            logger.warning("No partitions found")
-
+        if not partitions:
+            logger.warning("No <program> entries found in XML")
         return partitions
 
     @staticmethod

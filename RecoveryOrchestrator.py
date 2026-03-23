@@ -27,10 +27,30 @@ from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
 
+import shutil
+
 try:
     from serial.tools import list_ports as serial_list_ports
 except ImportError:
     serial_list_ports = None
+
+
+def _find_edl_tool():
+    """Return path to bkerler/edl tool (edl command or edl.py script)."""
+    edl_cmd = shutil.which("edl")
+    if edl_cmd:
+        return edl_cmd
+    candidates = [
+        Path.home() / "edl" / "edl.py",
+        Path.home() / "Desktop" / "edl-master" / "edl-master" / "edl.py",
+        Path.home() / "Desktop" / "edl" / "edl.py",
+        Path(__file__).parent / "edl.py",
+        Path(__file__).parent / "edl" / "edl.py",
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return None
 
 # Configure logging for educational traceability
 logging.basicConfig(
@@ -432,6 +452,10 @@ class RecoveryOrchestrator:
         self.validator = AssetValidator(self.work_dir)
         self.parser: Optional[PartitionParser] = None
         self.start_time = datetime.now()
+        # EDL engine attributes — set during initialize_edl()
+        self.use_real_edl: bool = False
+        self.edl_tool_path: Optional[str] = None
+        self.edl_engine = None
 
     def verify_assets(self) -> bool:
         """
@@ -505,64 +529,56 @@ class RecoveryOrchestrator:
         logger.info("EDL FRAMEWORK INITIALIZATION")
         logger.info("=" * 70)
 
-        # Check for local edl_tool clone
-        edl_tool_path = Path(r"C:\Users\Andrew Price\edl\edl.py")
-        if edl_tool_path.exists():
-            logger.info(f"  ✓ Found local EDL tool at: {edl_tool_path}")
-            self.edl_tool_path = str(edl_tool_path.resolve())
+        # 1. Try to find bkerler/edl tool
+        found_tool = _find_edl_tool()
+        if found_tool:
+            logger.info(f"  ✓ Found EDL tool at: {found_tool}")
+            self.edl_tool_path = found_tool
             self.use_real_edl = True
-            
-            # Check requirements
+
+            # Verify the tool runs
             try:
-                import usb.core
-                import docopt
-                import Crypto
-            except ImportError:
-                logger.warning("  ⚠ Missing dependencies for edl_tool. Installing...")
-                try:
-                    req_file = edl_tool_path.parent / "requirements.txt"
-                    subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=True)
-                    logger.info("  ✓ Dependencies installed.")
-                except Exception as e:
-                    logger.error(f"  ✗ Failed to install dependencies: {e}")
-                    self.use_real_edl = False
+                run_cmd = [sys.executable, found_tool, "--help"] if found_tool.endswith(".py") else [found_tool, "--help"]
+                subprocess.run(run_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+                logger.info("    ✓ EDL tool verified")
+            except Exception as e:
+                logger.warning(f"    ⚠ EDL tool check failed: {e}")
+                self.use_real_edl = False
 
             if self.use_real_edl:
-                # Test connection (printgpt is a safe check)
-                # This will only work if device is connected
-                logger.info("  Step 1: Detect EDL Device...")
+                # Try to detect device (non-fatal if not connected — simulation fallback)
+                logger.info("  Step 1: Detect EDL Device (QDLoader 9008)...")
                 try:
-                    # Just run help to verify script works
-                    subprocess.run([sys.executable, self.edl_tool_path, "--help"], stdout=subprocess.DEVNULL, check=True)
-                    logger.info("    ✓ EDL tool binary verified")
-                    
-                    # Try to detect device (might fail if not connected)
-                    res = subprocess.run([sys.executable, self.edl_tool_path, "printgpt", "--memory=ufs"], 
-                                       capture_output=True, text=True)
+                    run_cmd = ([sys.executable, found_tool] if found_tool.endswith(".py") else [found_tool])
+                    res = subprocess.run(
+                        run_cmd + ["printgpt", "--memory=ufs"],
+                        capture_output=True, text=True, timeout=10
+                    )
                     if res.returncode == 0:
                         logger.info("    ✓ Device detected in EDL mode (UFS)")
                         self.state = RecoveryState.DEVICE_DETECTED
-                        return True
                     else:
-                        logger.warning("    ⚠ Device not detected or not in EDL mode (Simulation fallback)")
-                        # We will fallback to simulation if device is not connected, but keep tool ready
-                        # self.use_real_edl = False  <-- Keep it True so we try later
-                        return True
+                        logger.warning("    ⚠ Device not detected — will attempt when flashing")
+                    return True
+                except subprocess.TimeoutExpired:
+                    logger.warning("    ⚠ Device detection timed out — will attempt when flashing")
+                    return True
                 except Exception as e:
-                    logger.error(f"  ✗ EDL tool execution failed: {e}")
-                    self.use_real_edl = False
+                    logger.warning(f"    ⚠ Device detection error: {e}")
+                    return True
 
+        # 2. Fallback: try importing EDLRecovery from same directory
         try:
-            # Import EDLRecovery module (fallback)
-            sys.path.append(r"C:\Users\Andrew Price")
-            from EDLRecovery import QualcommRecover
-            
+            _script_dir = str(Path(__file__).parent)
+            if _script_dir not in sys.path:
+                sys.path.insert(0, _script_dir)
+            from EDLRecovery import QualcommRecover  # noqa: F401
+
             self.edl_engine = QualcommRecover()
-            logger.info("  Step 1: Detect EDL Device (QDLoader 9008)...")
-            
+            logger.info("  Step 1: Detect EDL Device via EDLRecovery (QDLoader 9008)...")
+
             if self.edl_engine.find_device():
                 logger.info("    ✓ Device found")
-                
                 logger.info("  Step 2: Initialize Sahara Protocol...")
                 if self.edl_engine.connect_sahara():
                     logger.info("    ✓ Sahara initialized")
@@ -570,20 +586,17 @@ class RecoveryOrchestrator:
                     return True
                 else:
                     logger.error("    ✗ Sahara initialization failed")
+                    return False
             else:
-                logger.warning("    ⚠ No EDL device found (Simulation Mode)")
-                # For simulation purposes, we return True if no device found
-                # In production, this should return False
+                logger.warning("    ⚠ No EDL device found — running in simulation mode")
                 return True
 
         except ImportError:
-            logger.error("    ✗ Could not import EDLRecovery module")
-            return False
+            logger.warning("  ⚠ EDLRecovery module not available — simulation mode only")
+            return True
         except Exception as e:
-            logger.error(f"    ✗ Error initializing EDL: {e}")
+            logger.error(f"  ✗ EDL initialization error: {e}")
             return False
-
-        return True
 
     def inject_loader(self) -> bool:
         """
@@ -598,7 +611,7 @@ class RecoveryOrchestrator:
         loader_path = str(loader_info.path)
         logger.info(f"  Loader: {loader_info.name}")
 
-        if hasattr(self, 'edl_engine') and self.edl_engine.sahara:
+        if self.edl_engine is not None and getattr(self.edl_engine, 'sahara', None) is not None:
             logger.info("  Executing real loader injection...")
             if self.edl_engine.inject_loader(loader_path):
                 logger.info("  ✓ Loader injected successfully")
@@ -630,7 +643,7 @@ class RecoveryOrchestrator:
             return False
 
         # Use local edl_tool if initialized
-        if hasattr(self, 'use_real_edl') and self.use_real_edl:
+        if self.use_real_edl and self.edl_tool_path:
             logger.info("  Using bkerler/edl tool for flashing...")
             
             loader_path = str(self.validator.assets['loader'].path)
@@ -676,7 +689,7 @@ class RecoveryOrchestrator:
                 logger.error(f"  ✗ Error executing edl_tool: {e}")
                 return False
 
-        if hasattr(self, 'edl_engine') and self.edl_engine.sahara:
+        if self.edl_engine is not None and getattr(self.edl_engine, 'sahara', None) is not None:
             # Real flashing logic
             logger.info("  Transitioning to Firehose mode...")
             if not self.edl_engine.connect_firehose():
