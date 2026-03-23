@@ -1,1 +1,46 @@
-{"supported_functions": ["program", "read", "nop", "patch", "configure", "setbootablestoragedrive", "erase", "power", "firmwarewrite", "getstorageinfo", "benchmark", "emmc", "ufs", "fixgpt", "getsha256digest", "sha256init", "sha256final", "programcust", "erasebackupgpt", "eraseuserdata", "move", "getsigndata", "verify", "writever", "writelockdata", "getbasicdata", "writecdtdata", "resetdigest", "transfercfg", "devprg_spmi_init: success:0", "0x2646 SpmiBus_ReadLong: success:0x0", "0x2646 r_data: 0x0", "0x2640 r_data: 0x3", "VIP is enabled, receiving the partition info of size 36864"], "programmer": "C:\\Users\\Andrew Price\\OP11-AUTO-RECOVER\\flash_ready\\prog_firehose_ddr.elf", "serial": 727436113}
+{
+  "device": {
+    "model": "CPH2451",
+    "chipset": "SM8550",
+    "soc": "Snapdragon 8 Gen 2",
+    "firmware": "15.0.0.600 EX01",
+    "serial": 727436113,
+    "hwid": "001ca0e100510000",
+    "sahara_version": 3,
+    "firehose_version": "SM8550_V2.6"
+  },
+  "programmer": "prog_firehose_ddr.elf",
+  "memory": "ufs",
+  "luns": [0, 1, 2, 3, 4, 5],
+  "lun_map": {
+    "0": "GPT, super, userdata, persist",
+    "1": "xbl_a (bootloader slot A)",
+    "2": "xbl_b (bootloader slot B)",
+    "3": "cdt, ddr (calibration)",
+    "4": "boot, tz, modem, dsp, system (main firmware)",
+    "5": "nvbk, modemst1, modemst2, oplusreserve (modem NV)"
+  },
+  "supported_functions": [
+    "program", "read", "nop", "patch", "configure",
+    "setbootablestoragedrive", "erase", "power", "firmwarewrite",
+    "getstorageinfo", "benchmark", "fixgpt", "getsha256digest",
+    "sha256init", "sha256final", "programcust", "erasebackupgpt",
+    "eraseuserdata", "move", "getsigndata", "verify", "writever",
+    "writelockdata", "getbasicdata", "writecdtdata", "resetdigest",
+    "transfercfg", "devprg_spmi_init"
+  ],
+  "vip_bypass": {
+    "enabled": true,
+    "description": "OnePlus 11 VIP auth errors converted to warnings in edlclient/Library/firehose.py",
+    "patterns": [
+      "VIP img authentication failed",
+      "Verifying signature failed",
+      "Authentication of signed hash failed"
+    ]
+  },
+  "notes": [
+    "Set 'programmer' to the full path of prog_firehose_ddr.elf if not in firmware-dir.",
+    "Use ULTIMATE_UNBRICK_REAL.py --firmware-dir <IMAGES_DIR> --loader <prog_firehose_ddr.elf>",
+    "VIP bypass requires patching edlclient per VIP_BYPASS_IMPLEMENTATION.md"
+  ]
+}

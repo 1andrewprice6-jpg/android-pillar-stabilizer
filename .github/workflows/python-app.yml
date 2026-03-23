@@ -1,0 +1,54 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pyserial lxml pycryptodome colorama requests
+        # Install edl package if available; ignore failure (no hardware in CI)
+        pip install edl docopt || true
+
+    - name: Lint with flake8 (syntax errors and undefined names only)
+      run: |
+        # Stop on Python syntax errors or undefined names (E9, F63, F7, F82)
+        # Exclude Unity/game project, Android app, and vendored directories
+        flake8 . \
+          --count \
+          --select=E9,F63,F7,F82 \
+          --show-source \
+          --statistics \
+          --exclude=NEONPROTOCOL,app,.git,__pycache__,*.egg-info
+
+    - name: Style check (warnings only — does not fail build)
+      run: |
+        flake8 . \
+          --count \
+          --exit-zero \
+          --max-line-length=127 \
+          --max-complexity=12 \
+          --statistics \
+          --exclude=NEONPROTOCOL,app,.git,__pycache__,*.egg-info
+
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short

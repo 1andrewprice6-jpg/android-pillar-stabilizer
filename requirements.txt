@@ -1,0 +1,18 @@
+# OnePlus 11 (CPH2451) EDL Recovery Tool — Python dependencies
+#
+# Install: pip install -r requirements.txt
+#
+# Core EDL stack (bkerler/edl)
+edl>=3.62
+pyusb>=1.2.1
+pyserial>=3.5
+# edlclient XML parsing
+lxml>=4.9.0
+# edlclient cryptographic operations (Sahara/Firehose signed-image handling)
+pycryptodome>=3.17
+# edlclient CLI argument parsing
+docopt>=0.6.2
+# Colored console output (used by edlclient)
+colorama>=0.4.6
+# HTTP requests (optional: for OTA/firmware download helpers)
+requests>=2.28.0
