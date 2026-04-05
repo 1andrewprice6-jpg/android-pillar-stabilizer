@@ -1649,8 +1649,7 @@
                                     if (wildernessNarrowCount === 3) {
                                         unlockAchievement("overcomer");
                                     }
-                                    wildernessChoiceCount = 0;
-                                    wildernessNarrowCount = 0;
+                                    resetWildernessState();
                                     completeChapter();
                                 });
                             });
@@ -1757,6 +1756,9 @@
             game.unlockedAchievements = data.achievements;
             game.collectedVerses = data.verses;
             game.pathData = data.pathData;
+
+            // Reset wilderness state to prevent stale counters
+            resetWildernessState();
 
             // Update achievements
             achievements.forEach(a => {
