@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  sanity:
+    name: Sanity Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: List repository structure
+        run: find . -maxdepth 3 -not -path './.git/*' | sort
+
+      - name: Validate YAML workflow files
+        run: |
+          pip install --quiet yamllint
+          yamllint -d relaxed .github/workflows/

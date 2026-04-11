@@ -1,10 +1,6 @@
-name: Unity Cloud Build
+name: Unity Cloud Build (Manual Only)
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 env:

@@ -1,9 +1,6 @@
 name: Neon Protocol Android Forge
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
