@@ -12,6 +12,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -80,6 +81,9 @@ class MainActivity : AppCompatActivity() {
 
         // Load game from assets
         webView.loadUrl("file:///android_asset/game.html")
+
+        // Handle back navigation via WebView history
+        registerBackHandler()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -97,12 +101,17 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
-    override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
-        }
+    private fun registerBackHandler() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
     }
 
     override fun onPause() {

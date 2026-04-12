@@ -1327,7 +1327,7 @@
             if (game.currentSound) {
                 try {
                     game.currentSound.stop();
-                } catch (e) { /* Oscillator may already be stopped; safe to ignore */ }
+                } catch (e) { console.warn('Sound cleanup:', e); }
             }
 
             const ctx = game.audioContext;
@@ -1359,7 +1359,7 @@
                 setTimeout(() => {
                     try {
                         oscillator.stop();
-                    } catch (e) { /* Oscillator may already be stopped; safe to ignore */ }
+                    } catch (e) { console.warn('Sound stop:', e); }
                 }, 2000);
             }, 3000);
         }
