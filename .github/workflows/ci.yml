@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: List repository structure
         run: find . -maxdepth 3 -not -path './.git/*' | sort
@@ -22,4 +22,4 @@ jobs:
       - name: Validate YAML workflow files
         run: |
           pip install --quiet yamllint
-          yamllint -d relaxed .github/workflows/
+          yamllint -c .yamllint.yml .github/workflows/

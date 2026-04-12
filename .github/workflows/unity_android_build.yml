@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           lfs: true
 
       - name: Cache Library
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: NEONPROTOCOL/Library
           key: Library-${{ hashFiles('NEONPROTOCOL/Assets/**', 'NEONPROTOCOL/Packages/**', 'NEONPROTOCOL/ProjectSettings/**') }}
