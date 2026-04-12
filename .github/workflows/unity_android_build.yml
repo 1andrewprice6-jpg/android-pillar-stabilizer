@@ -4,7 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'NEONPROTOCOL/**'
+      - '.github/workflows/unity_android_build.yml'
   pull_request:
+    paths:
+      - 'NEONPROTOCOL/**'
+      - '.github/workflows/unity_android_build.yml'
 
 jobs:
   build:
