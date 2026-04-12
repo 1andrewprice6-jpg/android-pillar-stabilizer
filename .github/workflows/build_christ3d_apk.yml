@@ -45,7 +45,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Christ 3D Debug APK
-        run: ./gradlew :christ3d:assembleDebug --no-daemon
+        run: ./gradlew :christ3d:assembleDebug --no-daemon --stacktrace
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -55,7 +55,7 @@ jobs:
           if-no-files-found: error
 
       - name: Build Christ 3D Release APK (unsigned)
-        run: ./gradlew :christ3d:assembleRelease --no-daemon
+        run: ./gradlew :christ3d:assembleRelease --no-daemon --stacktrace
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
