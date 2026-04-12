@@ -25,8 +25,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install flake8 pytest pyserial lxml pycryptodome colorama requests
-        # Install edl package if available; ignore failure (no hardware in CI)
-        pip install edl docopt || true
+        # bkerler/edl is not on PyPI; hardware operations are skipped in CI
 
     - name: Lint with flake8 (syntax errors and undefined names only)
       run: |

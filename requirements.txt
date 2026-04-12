@@ -2,8 +2,9 @@
 #
 # Install: pip install -r requirements.txt
 #
-# Core EDL stack (bkerler/edl)
-edl>=3.62
+# Core EDL stack (bkerler/edl) — not on PyPI; install from source for hardware use:
+#   pip install git+https://github.com/bkerler/edl.git
+# In CI (no hardware), this dependency is skipped automatically.
 pyusb>=1.2.1
 pyserial>=3.5
 # edlclient XML parsing
