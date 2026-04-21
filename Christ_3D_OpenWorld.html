@@ -477,6 +477,93 @@
             background: #ffd700;
         }
 
+        /* Player Profile Panel */
+        #profile-container {
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 450px;
+            overflow-y: auto;
+            padding: 10px 20px 20px;
+        }
+
+        #profile-container.visible {
+            display: flex;
+        }
+
+        .level-badge {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .level-badge .level-icon {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .level-badge .level-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 12px rgba(255, 215, 0, 0.9);
+        }
+
+        .level-badge .level-subtitle {
+            font-size: 14px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        .xp-bar-wrap {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #ffd700;
+            border-radius: 20px;
+            height: 14px;
+            overflow: hidden;
+            margin: 6px 0 2px;
+        }
+
+        .xp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ffec6e);
+            border-radius: 20px;
+            transition: width 0.5s ease;
+        }
+
+        .xp-bar-label {
+            font-size: 12px;
+            color: #aaa;
+            text-align: right;
+        }
+
+        .profile-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 215, 0, 0.08);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+        }
+
+        .profile-stat-label {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .profile-stat-value {
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .profile-divider {
+            border: none;
+            border-top: 1px solid rgba(255, 215, 0, 0.25);
+            margin: 4px 0;
+        }
+
         /* Volume Control */
         #volume-control {
             margin: 20px 0;
@@ -596,6 +683,7 @@
         <div id="hud">
             <div id="chapter-indicator">Chapter 1: The Incarnation</div>
             <div id="xp-display">
+                <div class="xp-item" id="level-display">Lv 1 · Pilgrim</div>
                 <div class="xp-item">XP: <span id="xp-value">0</span></div>
                 <div class="xp-item streak">Streak: <span id="streak-value">0</span>x</div>
             </div>
@@ -634,6 +722,7 @@
     <div id="menu-overlay">
         <div id="menu-content">
             <h2>Menu</h2>
+            <button class="menu-btn" onclick="game.showProfile()">My Profile</button>
             <button class="menu-btn" onclick="game.showSaveLoad('save')">Save Game</button>
             <button class="menu-btn" onclick="game.showSaveLoad('load')">Load Game</button>
             <button class="menu-btn" onclick="game.showAchievements()">Achievements</button>
@@ -672,6 +761,9 @@
 
             <!-- Verses View -->
             <div id="verses-container"></div>
+
+            <!-- Profile View -->
+            <div id="profile-container"></div>
 
             <!-- Path Map View -->
             <div id="path-map-container">
@@ -1431,10 +1523,30 @@
             }, 1500);
         }
 
+        function getLevel(xp) {
+            const tiers = [
+                { min: 10000, level: 7, title: "Apostle",  icon: "👑" },
+                { min:  7500, level: 6, title: "Witness",  icon: "✨" },
+                { min:  5000, level: 5, title: "Servant",  icon: "🙏" },
+                { min:  3000, level: 4, title: "Believer", icon: "📖" },
+                { min:  1500, level: 3, title: "Disciple", icon: "🎣" },
+                { min:   500, level: 2, title: "Seeker",   icon: "🌟" },
+                { min:     0, level: 1, title: "Pilgrim",  icon: "🚶" },
+            ];
+            const tier = tiers.find(t => xp >= t.min) || tiers[tiers.length - 1];
+            const nextTier = tiers[tiers.indexOf(tier) - 1];
+            const prevMin = tier.min;
+            const nextMin = nextTier ? nextTier.min : null;
+            const progress = nextMin ? Math.min(1, (xp - prevMin) / (nextMin - prevMin)) : 1;
+            return { ...tier, progress, nextMin };
+        }
+
         function updateHUD() {
             document.getElementById('xp-value').textContent = game.xp;
             document.getElementById('streak-value').textContent = game.streak;
             document.getElementById('chapter-indicator').textContent = story.chapters[game.currentChapter].title;
+            const lv = getLevel(game.xp);
+            document.getElementById('level-display').textContent = `Lv ${lv.level} · ${lv.title}`;
         }
 
         function showAchievement(achievement) {
@@ -1828,6 +1940,62 @@
                 if (el.id !== 'volume-control') el.style.display = 'none';
             });
             document.querySelectorAll('.menu-btn').forEach(btn => btn.style.display = 'block');
+        };
+
+        game.showProfile = function() {
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.style.display = 'none');
+            const container = document.getElementById('profile-container');
+            container.innerHTML = '';
+            container.classList.add('visible');
+
+            const lv = getLevel(game.xp);
+            const totalChoices = game.pathData.narrow + game.pathData.wide;
+            const narrowPct = totalChoices > 0 ? Math.round((game.pathData.narrow / totalChoices) * 100) : 0;
+            const chapterNum = game.currentChapter + 1;
+            const totalChapters = story.chapters.length;
+            const unlockedCount = game.unlockedAchievements.length;
+
+            const barPct = Math.round(lv.progress * 100);
+            const xpToNext = lv.nextMin ? (lv.nextMin - game.xp) + ' XP to next level' : 'Max level reached';
+
+            container.innerHTML = `
+                <div class="level-badge">
+                    <span class="level-icon">${lv.icon}</span>
+                    <div class="level-title">Level ${lv.level} — ${lv.title}</div>
+                    <div class="level-subtitle">${xpToNext}</div>
+                    <div class="xp-bar-wrap" title="${barPct}% to next level">
+                        <div class="xp-bar-fill" style="width: ${barPct}%;"></div>
+                    </div>
+                    <div class="xp-bar-label">${game.xp} XP total</div>
+                </div>
+                <hr class="profile-divider">
+                <div class="profile-stat">
+                    <span class="profile-stat-label">📍 Chapter Progress</span>
+                    <span class="profile-stat-value">${chapterNum} / ${totalChapters}</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat-label">⚡ Current Streak</span>
+                    <span class="profile-stat-value">${game.streak}x</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat-label">🎯 Narrow Path Rate</span>
+                    <span class="profile-stat-value">${narrowPct}% (${game.pathData.narrow} / ${totalChoices})</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat-label">🏆 Achievements</span>
+                    <span class="profile-stat-value">${unlockedCount} / ${achievements.length}</span>
+                </div>
+                <div class="profile-stat">
+                    <span class="profile-stat-label">📖 Verses Collected</span>
+                    <span class="profile-stat-value">${game.collectedVerses.length}</span>
+                </div>
+            `;
+
+            const backBtn = document.createElement('button');
+            backBtn.className = 'menu-btn';
+            backBtn.textContent = 'Back';
+            backBtn.onclick = game.backToMainMenu;
+            container.appendChild(backBtn);
         };
 
         game.showAchievements = function() {
