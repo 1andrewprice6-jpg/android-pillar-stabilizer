@@ -132,7 +132,8 @@ class CounterResonanceGenerator {
         generatorScope.cancel()
     }
 
-    override fun finalize() {
+    @Suppress("ProtectedInFinal")
+    protected fun finalize() {
         try {
             cleanup()
         } catch (e: Exception) {

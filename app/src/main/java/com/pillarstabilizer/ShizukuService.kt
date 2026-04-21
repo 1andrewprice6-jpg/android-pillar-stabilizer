@@ -5,6 +5,8 @@ import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuRemoteProcess
+import java.lang.reflect.Method
 import java.util.concurrent.TimeUnit
 
 object ShizukuService {
@@ -102,7 +104,15 @@ object ShizukuService {
             }
 
             val process = try {
-                Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+                val method: Method = Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                method.isAccessible = true
+                @Suppress("UNCHECKED_CAST")
+                method.invoke(null, arrayOf("sh", "-c", command), null, null) as ShizukuRemoteProcess
             } catch (e: Exception) {
                 return@withContext ShellResult(
                     output = "",
