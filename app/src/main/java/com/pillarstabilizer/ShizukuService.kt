@@ -7,6 +7,21 @@ import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 import java.util.concurrent.TimeUnit
 
+// Shizuku.newProcess() is public in the Java source but not accessible from Kotlin in
+// the compiled Shizuku API 13 artifact.  Use reflection so we don't have to downgrade
+// the dependency or resort to suppression hacks.
+private fun createShizukuProcess(command: String): Process {
+    val cls = Class.forName("rikka.shizuku.Shizuku")
+    val method = cls.getDeclaredMethod(
+        "newProcess",
+        Array<String>::class.java,
+        Array<String>::class.java,
+        String::class.java,
+    )
+    method.isAccessible = true
+    return method.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+}
+
 object ShizukuService {
     private const val SHIZUKU_PERMISSION_CODE = 1001
     private const val DEFAULT_TIMEOUT_MS = 10000L
@@ -102,7 +117,7 @@ object ShizukuService {
             }
 
             val process = try {
-                Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+                createShizukuProcess(command)
             } catch (e: Exception) {
                 return@withContext ShellResult(
                     output = "",
@@ -111,13 +126,13 @@ object ShizukuService {
                 )
             }
 
-            return@withContext process.use { p ->
+            return@withContext try {
                 val outputBuilder = StringBuilder()
                 val errorBuilder = StringBuilder()
 
                 val outputThread = Thread {
                     try {
-                        p.inputStream.bufferedReader().use { reader ->
+                        process.inputStream.bufferedReader().use { reader ->
                             reader.forEachLine { outputBuilder.appendLine(it) }
                         }
                     } catch (e: Exception) {
@@ -127,7 +142,7 @@ object ShizukuService {
 
                 val errorThread = Thread {
                     try {
-                        p.errorStream.bufferedReader().use { reader ->
+                        process.errorStream.bufferedReader().use { reader ->
                             reader.forEachLine { errorBuilder.appendLine(it) }
                         }
                     } catch (e: Exception) {
@@ -138,13 +153,13 @@ object ShizukuService {
                 outputThread.start()
                 errorThread.start()
 
-                val completed = p.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+                val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
                 if (!completed) {
-                    p.destroyForcibly()
+                    process.destroyForcibly()
                     outputThread.interrupt()
                     errorThread.interrupt()
-                    return@use ShellResult(
+                    return@withContext ShellResult(
                         output = outputBuilder.toString().trim(),
                         error = "Command timeout after ${timeoutMs}ms",
                         exitCode = -1
@@ -158,8 +173,10 @@ object ShizukuService {
                 ShellResult(
                     output = outputBuilder.toString().trim(),
                     error = errorBuilder.toString().trim(),
-                    exitCode = p.exitValue()
+                    exitCode = process.exitValue()
                 )
+            } finally {
+                process.destroy()
             }
         } catch (e: Exception) {
             ShellResult(
