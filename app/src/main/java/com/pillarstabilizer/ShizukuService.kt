@@ -111,8 +111,9 @@ object ShizukuService {
                     String::class.java
                 )
                 method.isAccessible = true
-                @Suppress("UNCHECKED_CAST")
-                method.invoke(null, arrayOf("sh", "-c", command), null, null) as ShizukuRemoteProcess
+                val result = method.invoke(null, arrayOf("sh", "-c", command), null, null)
+                result as? ShizukuRemoteProcess
+                    ?: throw IllegalStateException("newProcess returned unexpected type: ${result?.javaClass}")
             } catch (e: Exception) {
                 return@withContext ShellResult(
                     output = "",
