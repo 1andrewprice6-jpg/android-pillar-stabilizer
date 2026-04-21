@@ -141,31 +141,35 @@ object ShizukuService {
                 }
             }
 
-            outputThread.start()
-            errorThread.start()
+            try {
+                outputThread.start()
+                errorThread.start()
 
-            val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+                val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
-            if (!completed) {
-                process.destroyForcibly()
-                outputThread.interrupt()
-                errorThread.interrupt()
+                if (!completed) {
+                    process.destroyForcibly()
+                    outputThread.interrupt()
+                    errorThread.interrupt()
+                    return@withContext ShellResult(
+                        output = outputBuilder.toString().trim(),
+                        error = "Command timeout after ${timeoutMs}ms",
+                        exitCode = -1
+                    )
+                }
+
+                // Wait for threads to finish reading streams
+                outputThread.join(1000)
+                errorThread.join(1000)
+
                 return@withContext ShellResult(
                     output = outputBuilder.toString().trim(),
-                    error = "Command timeout after ${timeoutMs}ms",
-                    exitCode = -1
+                    error = errorBuilder.toString().trim(),
+                    exitCode = process.exitValue()
                 )
+            } finally {
+                process.destroy()
             }
-
-            // Wait for threads to finish reading streams
-            outputThread.join(1000)
-            errorThread.join(1000)
-
-            return@withContext ShellResult(
-                output = outputBuilder.toString().trim(),
-                error = errorBuilder.toString().trim(),
-                exitCode = process.exitValue()
-            )
         } catch (e: Exception) {
             ShellResult(
                 output = "",
