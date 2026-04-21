@@ -51,6 +51,15 @@ local.properties
 workspace/loaders/*.elf
 workspace/loaders/*.mbn
 workspace/scripts/__pycache__/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 workspace/scripts/logs/
 
 # Project specific
