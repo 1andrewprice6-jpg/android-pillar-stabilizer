@@ -132,7 +132,7 @@ class CounterResonanceGenerator {
         generatorScope.cancel()
     }
 
-    override fun finalize() {
+    fun finalize() {
         try {
             cleanup()
         } catch (e: Exception) {

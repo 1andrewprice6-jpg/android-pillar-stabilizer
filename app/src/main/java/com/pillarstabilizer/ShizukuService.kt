@@ -101,8 +101,15 @@ object ShizukuService {
                 )
             }
 
-            val process = try {
-                Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+            val process: Process = try {
+                val m = Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                m.isAccessible = true
+                m.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
             } catch (e: Exception) {
                 return@withContext ShellResult(
                     output = "",
@@ -111,56 +118,54 @@ object ShizukuService {
                 )
             }
 
-            return@withContext process.use { p ->
-                val outputBuilder = StringBuilder()
-                val errorBuilder = StringBuilder()
+            val outputBuilder = StringBuilder()
+            val errorBuilder = StringBuilder()
 
-                val outputThread = Thread {
-                    try {
-                        p.inputStream.bufferedReader().use { reader ->
-                            reader.forEachLine { outputBuilder.appendLine(it) }
-                        }
-                    } catch (e: Exception) {
-                        // Stream closed, which is expected on process termination
+            val outputThread = Thread {
+                try {
+                    process.inputStream.bufferedReader().use { reader ->
+                        reader.forEachLine { outputBuilder.appendLine(it) }
                     }
+                } catch (e: Exception) {
+                    // Stream closed, which is expected on process termination
                 }
+            }
 
-                val errorThread = Thread {
-                    try {
-                        p.errorStream.bufferedReader().use { reader ->
-                            reader.forEachLine { errorBuilder.appendLine(it) }
-                        }
-                    } catch (e: Exception) {
-                        // Stream closed, which is expected on process termination
+            val errorThread = Thread {
+                try {
+                    process.errorStream.bufferedReader().use { reader ->
+                        reader.forEachLine { errorBuilder.appendLine(it) }
                     }
+                } catch (e: Exception) {
+                    // Stream closed, which is expected on process termination
                 }
+            }
 
-                outputThread.start()
-                errorThread.start()
+            outputThread.start()
+            errorThread.start()
 
-                val completed = p.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+            val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
-                if (!completed) {
-                    p.destroyForcibly()
-                    outputThread.interrupt()
-                    errorThread.interrupt()
-                    return@use ShellResult(
-                        output = outputBuilder.toString().trim(),
-                        error = "Command timeout after ${timeoutMs}ms",
-                        exitCode = -1
-                    )
-                }
-
-                // Wait for threads to finish reading streams
-                outputThread.join(1000)
-                errorThread.join(1000)
-
-                ShellResult(
+            if (!completed) {
+                process.destroyForcibly()
+                outputThread.interrupt()
+                errorThread.interrupt()
+                return@withContext ShellResult(
                     output = outputBuilder.toString().trim(),
-                    error = errorBuilder.toString().trim(),
-                    exitCode = p.exitValue()
+                    error = "Command timeout after ${timeoutMs}ms",
+                    exitCode = -1
                 )
             }
+
+            // Wait for threads to finish reading streams
+            outputThread.join(1000)
+            errorThread.join(1000)
+
+            return@withContext ShellResult(
+                output = outputBuilder.toString().trim(),
+                error = errorBuilder.toString().trim(),
+                exitCode = process.exitValue()
+            )
         } catch (e: Exception) {
             ShellResult(
                 output = "",
