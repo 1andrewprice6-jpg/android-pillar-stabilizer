@@ -48,7 +48,12 @@ jobs:
             if [ "$IS_FORK_PR" = "true" ]; then
               echo "::warning::Unity license secrets are not available on fork PRs. The build step will be skipped."
             else
-              echo "::error::Unity license secrets are not configured. Add one of the following sets of secrets under Settings → Secrets and variables → Actions:%0A  Personal license: UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD%0A  Pro / Plus:       UNITY_SERIAL,  UNITY_EMAIL, UNITY_PASSWORD%0ASee https://game.ci/docs/github/activation for activation steps."
+              MSG="Unity license secrets are not configured."
+              MSG="${MSG}%0AAdd one of the following sets of secrets under Settings → Secrets and variables → Actions:"
+              MSG="${MSG}%0A  Personal license: UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD"
+              MSG="${MSG}%0A  Pro / Plus:       UNITY_SERIAL,  UNITY_EMAIL, UNITY_PASSWORD"
+              MSG="${MSG}%0ASee https://game.ci/docs/github/activation for activation steps."
+              echo "::error::${MSG}"
               exit 1
             fi
           fi
