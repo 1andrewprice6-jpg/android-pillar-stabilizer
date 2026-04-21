@@ -35,6 +35,16 @@ def _stub_module(name):
     return sys.modules[name]
 
 
+# Stub lxml (not installed in CI) — redirect to stdlib xml.etree.ElementTree
+import xml.etree.ElementTree as _stdlib_ET
+lxml_mod = _stub_module("lxml")
+lxml_etree_mod = _stub_module("lxml.etree")
+# Mirror the stdlib ET API that EDLRecovery uses
+lxml_etree_mod.parse = _stdlib_ET.parse
+lxml_etree_mod.ParseError = _stdlib_ET.ParseError
+lxml_etree_mod.Element = _stdlib_ET.Element
+lxml_mod.etree = lxml_etree_mod
+
 # Stub pyusb (no USB hardware in CI)
 usb_mod = _stub_module("usb")
 usb_core_mod = _stub_module("usb.core")
