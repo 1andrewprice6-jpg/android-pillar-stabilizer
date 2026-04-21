@@ -17,7 +17,7 @@ jobs:
           lfs: true
 
       - name: Cache Library
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: NEONPROTOCOL/Library
           key: Library-${{ hashFiles('NEONPROTOCOL/Assets/**', 'NEONPROTOCOL/Packages/**', 'NEONPROTOCOL/ProjectSettings/**') }}
@@ -34,7 +34,7 @@ jobs:
           targetPlatform: Android
           projectPath: NEONPROTOCOL
           buildName: NEON_PROTOCOL_ANDROID
-          androidAppBundle: false
+          androidExportType: androidPackage
           androidKeystoreName: user.keystore
           androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
