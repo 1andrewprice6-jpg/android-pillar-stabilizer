@@ -50,6 +50,7 @@ local.properties
 # EDL Recovery - ignore large binary loaders and runtime logs
 workspace/loaders/*.elf
 workspace/loaders/*.mbn
+__pycache__/
 workspace/scripts/__pycache__/
 workspace/scripts/logs/
 
