@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Pillar Stabilizer"
 include(":app")
+include(":christ3d")
