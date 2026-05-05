@@ -80,36 +80,31 @@ class ShellExecutor {
      * Read battery info with fallback paths for different devices.
      */
     suspend fun getBatteryInfo(): BatteryInfo {
-        // Try primary path first
-        var current = readBatteryValue("/sys/class/power_supply/battery/current_now")
-        var voltage = readBatteryValue("/sys/class/power_supply/battery/voltage_now")
-        var temp = readBatteryValue("/sys/class/power_supply/battery/temp")
-
-        // Fallback to alternative paths if primary fails
-        if (current == 0L) {
-            current = readBatteryValue("/sys/class/power_supply/bms/current_now")
-        }
-        if (voltage == 0L) {
-            voltage = readBatteryValue("/sys/class/power_supply/bms/voltage_now")
-        }
-        if (temp == 0) {
-            temp = readBatteryValue("/sys/class/power_supply/bms/temp")?.toInt() ?: 0
-        }
+        // Try primary path first, fall back to BMS-style paths used by some devices
+        val current = readLongValue("/sys/class/power_supply/battery/current_now")
+            ?: readLongValue("/sys/class/power_supply/bms/current_now")
+            ?: 0L
+        val voltage = readLongValue("/sys/class/power_supply/battery/voltage_now")
+            ?: readLongValue("/sys/class/power_supply/bms/voltage_now")
+            ?: 0L
+        val temp = readLongValue("/sys/class/power_supply/battery/temp")
+            ?: readLongValue("/sys/class/power_supply/bms/temp")
+            ?: 0L
 
         return BatteryInfo(
             currentMicroamps = current,
             voltageMicrovolts = voltage,
-            temperatureDeciCelsius = temp as? Int ?: 0
+            temperatureDeciCelsius = temp.toInt()
         )
     }
 
     /**
-     * Helper to safely read battery values with error handling.
+     * Helper to safely read a numeric sysfs value as Long.
      */
-    private suspend fun readBatteryValue(path: String): Number? {
+    private suspend fun readLongValue(path: String): Long? {
         val result = execute("cat $path 2>/dev/null")
         return if (result.isSuccess && result.output.isNotBlank()) {
-            result.output.trim().toLongOrNull() ?: result.output.trim().toIntOrNull()
+            result.output.trim().toLongOrNull()
         } else {
             null
         }

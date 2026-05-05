@@ -121,6 +121,7 @@ class PillarViewModel : ViewModel() {
 
     private fun observeResonanceData() {
         viewModelScope.launch {
+            @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
             HardwareResonanceReader.instance.flatMapLatest { service ->
                 service?.resonanceData ?: MutableStateFlow(ResonanceData())
             }.collect { data ->
